@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>採点入力</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --line:#333; --panel-blue:#dfe3f5; --panel-blue-ink:#3f51b5;
+    --d-bg:#d9e8e6; --d-ink:#7a9a96; --e-bg:#5f7d7a; --final-bg:#b23a2a;
+    --btn:#4d79e6; --btn-hover:#3a63cc; --gray:#eee; --warn:#c0392b; --ok:#2e7d32;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;
+    color:var(--ink); background:#fafafa; padding:16px; max-width:1100px; margin:0 auto;}
+
+  /* タブ */
+  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .tabs .tab{padding:8px 22px; border:1px solid #bbb; background:#fff; cursor:pointer;
+    border-radius:6px 6px 0 0; font-size:15px; user-select:none;}
+  .tabs .tab.active{background:var(--btn); color:#fff; border-color:var(--btn); font-weight:bold;}
+  .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#111;}
+
+  .card{background:#fff; border:1px solid #ddd; border-radius:8px; padding:20px; margin-top:6px;}
+
+  /* ヘッダ行：モード表示・ゼッケン・選手 */
+  .head{display:flex; align-items:stretch; gap:14px; margin-bottom:6px;}
+  .ctx{display:flex; flex-direction:column; justify-content:center; min-width:70px; font-size:17px; line-height:1.6;}
+  .mode-badge{display:inline-block; padding:2px 12px; font-weight:bold; font-size:16px; margin-top:8px; width:fit-content;}
+  .mode-badge.input{background:#8ee65c;}
+  .mode-badge.correction{background:#ffe95c; color:var(--warn);}
+  .bib-wrap{display:flex; flex-direction:column;}
+  .bib-wrap label{font-size:14px; text-align:center; margin-bottom:2px;}
+  #bib{width:130px; height:76px; font-size:34px; text-align:center; border:1px solid var(--line);}
+  .player{flex:1; display:flex; flex-direction:column; border:1px solid var(--panel-blue-ink);}
+  .player div{flex:1; display:flex; align-items:center; justify-content:center;
+    background:var(--panel-blue); color:var(--panel-blue-ink); font-size:22px;}
+  .player div + div{border-top:1px solid var(--panel-blue-ink);}
+  .player.found div{color:#111; font-weight:bold;}
+  .player.notfound div{color:var(--warn);}
+
+  /* スコアボックス */
+  .grid{display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-top:18px;}
+  .box{border:1px solid var(--line); display:flex; flex-direction:column;}
+  .box .lbl{border-bottom:1px solid var(--line); text-align:center; font-size:15px; padding:4px;
+    white-space:nowrap; overflow:hidden;}
+  .box input{border:none; width:100%; flex:1; min-height:64px; font-size:32px; text-align:center; outline:none; background:transparent;}
+  .box input:focus{background:#fffbe0;}
+  .box.calc .lbl{color:#fff; font-weight:bold;}
+  .box.calc .val{flex:1; min-height:64px; display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:bold; color:#fff;}
+  .box.dscore{background:var(--d-bg);} .box.dscore .lbl{color:var(--d-ink); font-weight:bold; border-color:var(--line);}
+  .box.dscore input{color:var(--d-ink); font-weight:bold;}
+  .box.escore{background:var(--e-bg);} .box.escore .lbl{border-color:#fff;}
+  .box.final{background:var(--final-bg); grid-column:span 2;} .box.final .lbl{border-color:#fff;}
+  .box.final .val{font-size:38px;}
+  .box.pen{background:var(--gray);}
+  .spacer{visibility:hidden;}
+
+  /* 送信 */
+  #send{width:100%; margin-top:22px; padding:16px; font-size:22px; font-weight:bold;
+    color:#fff; background:var(--btn); border:none; border-radius:4px; cursor:pointer;}
+  #send:hover{background:var(--btn-hover);}
+  #send:disabled{background:#aaa; cursor:not-allowed;}
+
+  #status{margin-top:10px; text-align:center; font-size:16px; min-height:24px;}
+  #status.ok{color:var(--ok); font-weight:bold;} #status.err{color:var(--warn); font-weight:bold;}
+
+  .toolbar{display:flex; justify-content:flex-end; gap:10px; margin-top:14px; font-size:13px; color:#666;}
+  .toolbar button{font-size:13px; padding:4px 10px; cursor:pointer;}
+  #setup{background:#fff3cd; border:1px solid #e0c96a; padding:12px; border-radius:6px; margin-bottom:12px; font-size:14px; display:none;}
+
+  /* ===== タブレット（タッチ端末）向け ===== */
+  body{touch-action:manipulation;} /* ダブルタップズームの誤作動防止 */
+  @media (pointer:coarse){
+    body{padding:10px;}
+    .card{padding:14px;}
+    .grid{margin-top:12px; gap:10px;}
+    .tabs .tab{padding:12px 22px; font-size:17px;}
+    .box .lbl{font-size:16px; padding:6px;}
+    .box input, .box .val{min-height:64px;}
+    #bib{height:84px;}
+    #send{padding:18px; font-size:24px; margin-top:14px;}
+    .toolbar button{font-size:16px; padding:10px 16px;}
+  }
+  /* 縦持ちなど幅が狭い場合は文字を詰めてラベルの折返しを防ぐ */
+  @media (max-width:900px){
+    .grid{gap:8px;}
+    .box .lbl{font-size:13px; padding:4px 2px;}
+    .box input, .box .val{font-size:24px; min-height:56px;}
+    .box.final .val{font-size:28px;}
+    .player div{font-size:18px;}
+  }
+
+  /* 画面内テンキー（タッチ端末のみ表示） */
+  #keypad{display:none; position:fixed; left:0; right:0; bottom:0; z-index:50;
+    background:#2b2f3a; padding:8px; box-shadow:0 -4px 12px rgba(0,0,0,.35);}
+  #keypad .kp-grid{max-width:560px; margin:0 auto; display:grid;
+    grid-template-columns:repeat(4,1fr); gap:8px;}
+  #keypad button{height:58px; font-size:25px; border:none; border-radius:8px;
+    background:#f2f2f2; cursor:pointer;}
+  #keypad button:active{background:#cfd8ff;}
+  #keypad button.fn{background:#8a93a8; color:#fff; font-size:18px;}
+  #keypad button.next{background:var(--btn); color:#fff; font-size:20px; font-weight:bold;}
+  body.keypad-open{padding-bottom:300px;}
+  body.keypad-open #keypad{display:block;}
+  .box input.kfocus, #bib.kfocus{background:#fffbe0; outline:3px solid var(--btn); outline-offset:-3px;}
+
+  /* 横持ちのタブレットではテンキーを右側に縦配置し、スコア欄を隠さない */
+  @media (pointer:coarse) and (orientation:landscape){
+    #keypad{left:auto; top:0; bottom:0; right:0; width:310px; padding:12px;
+      box-shadow:-4px 0 12px rgba(0,0,0,.35); overflow-y:auto;}
+    body.keypad-open{padding-bottom:0; padding-right:322px; max-width:none;}
+    body.keypad-open #keypad{display:flex; align-items:center;}
+    #keypad .kp-grid{width:100%;}
+    #keypad button{height:74px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  Apps ScriptのウェブアプリURLが設定されていません。index.html内の <code>GAS_URL</code> にデプロイしたURL（…/exec）を貼り付けてください。
+</div>
+
+<!-- 性別タブ -->
+<div class="tabs" id="genderTabs"></div>
+<!-- 種目タブ -->
+<div class="tabs" id="eventTabs"></div>
+<!-- モードタブ -->
+<div class="tabs mode-tabs" id="modeTabs"></div>
+
+<div class="card">
+  <div class="head">
+    <div class="ctx">
+      <span id="ctxGender">女子</span>
+      <span id="ctxEvent">ゆか</span>
+      <span class="mode-badge input" id="modeBadge">入力</span>
+    </div>
+    <div class="bib-wrap">
+      <label>ゼッケン</label>
+      <input id="bib" type="text" inputmode="numeric" autocomplete="off">
+    </div>
+    <div class="player" id="playerBox">
+      <div id="playerName">選手名</div>
+      <div id="playerTeam">所属（○○県）</div>
+    </div>
+  </div>
+
+  <div class="grid" id="row1">
+    <div class="box dscore"><div class="lbl">Dスコア</div><input id="f_D" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">高体連加点</div><input id="f_katen" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">SB</div><input id="f_SB" type="number" step="0.1" min="0"></div>
+    <div class="box calc final" id="finalBox"><div class="lbl">決定点</div><div class="val" id="finalVal">-</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="box"><div class="lbl">E1</div><input id="f_E1" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">E2</div><input id="f_E2" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">E3</div><input id="f_E3" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">E4</div><input id="f_E4" type="number" step="0.1" min="0"></div>
+    <div class="box calc escore" id="escoreBox"><div class="lbl">Eスコア</div><div class="val" id="escoreVal">-</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="box"><div class="lbl">主審</div><input id="f_shushin" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">計時</div><input id="f_time" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">LINE1</div><input id="f_line1" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">LINE2</div><input id="f_line2" type="number" step="0.1" min="0"></div>
+    <div class="box calc pen" id="penBox"><div class="lbl" style="color:#333">ペナルティ</div><div class="val" id="penVal" style="color:#333">-</div></div>
+  </div>
+
+  <button id="send">本部記録へ送信</button>
+  <div id="status"></div>
+
+  <div class="toolbar">
+    <span id="cacheInfo"></span>
+    <button id="reloadPlayers">選手データ更新</button>
+  </div>
+</div>
+
+<!-- タッチ端末用テンキー -->
+<div id="keypad">
+  <div class="kp-grid">
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button class="fn" data-k="bs">⌫</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button class="fn" data-k="clear">クリア</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button class="fn" data-k="close">閉じる</button>
+    <button data-k="0">0</button><button data-k=".">.</button>
+    <button class="next" data-k="next" style="grid-column:span 2">次へ →</button>
+  </div>
+</div>
+
+<script>
+/* ================= 設定 =================
+   Apps Script をウェブアプリとしてデプロイし、
+   URL（https://script.google.com/macros/s/XXXX/exec）を貼り付ける。
+   API_TOKEN は Code.gs 側と同じ文字列を設定する（推測されにくい長い文字列に）。 */
+const GAS_URL = "";
+const API_TOKEN = "";
+
+/* ================= 定数 ================= */
+const EVENTS = {
+  "男子": ["ゆか","あん馬","つり輪","跳馬","平行棒","鉄棒"],
+  "女子": ["跳馬１本目","跳馬２本目","段違い平行棒","平均台","ゆか"]
+};
+const SCORE_IDS = ["f_D","f_katen","f_SB","f_E1","f_E2","f_E3","f_E4","f_shushin","f_time","f_line1","f_line2"];
+
+/* ================= 状態（リロード後も保持） ================= */
+const state = {
+  gender: localStorage.getItem("sc_gender") || "女子",
+  event:  localStorage.getItem("sc_event")  || "",
+  mode:   localStorage.getItem("sc_mode")   || "入力"
+};
+if(!EVENTS[state.gender].includes(state.event)) state.event = EVENTS[state.gender][0];
+
+let players = {"男子":[], "女子":[]};
+
+/* ================= タブ描画 ================= */
+function renderTabs(){
+  const g = document.getElementById("genderTabs");
+  g.innerHTML = "";
+  ["男子","女子"].forEach(x=>{
+    const b = document.createElement("div");
+    b.className = "tab" + (x===state.gender ? " active" : "");
+    b.textContent = x;
+    b.onclick = ()=>{ state.gender = x;
+      if(!EVENTS[x].includes(state.event)) state.event = EVENTS[x][0];
+      saveState(); renderTabs(); refreshContext(); lookupPlayer(); };
+    g.appendChild(b);
+  });
+  const e = document.getElementById("eventTabs");
+  e.innerHTML = "";
+  EVENTS[state.gender].forEach(x=>{
+    const b = document.createElement("div");
+    b.className = "tab" + (x===state.event ? " active" : "");
+    b.textContent = x;
+    b.onclick = ()=>{ state.event = x; saveState(); renderTabs(); refreshContext(); };
+    e.appendChild(b);
+  });
+  const m = document.getElementById("modeTabs");
+  m.innerHTML = "";
+  ["入力","訂正"].forEach(x=>{
+    const b = document.createElement("div");
+    const label = x==="入力" ? "得点入力" : "得点訂正";
+    b.className = "tab" + (x===state.mode ? " active" : "") + (x==="訂正" ? " correction" : "");
+    b.textContent = label;
+    b.onclick = ()=>{ state.mode = x; saveState(); renderTabs(); refreshContext(); recalc(); };
+    m.appendChild(b);
+  });
+}
+function saveState(){
+  localStorage.setItem("sc_gender", state.gender);
+  localStorage.setItem("sc_event",  state.event);
+  localStorage.setItem("sc_mode",   state.mode);
+}
+function refreshContext(){
+  document.getElementById("ctxGender").textContent = state.gender;
+  document.getElementById("ctxEvent").textContent  = state.event;
+  const badge = document.getElementById("modeBadge");
+  badge.textContent = state.mode;
+  badge.className = "mode-badge " + (state.mode==="入力" ? "input" : "correction");
+  // 訂正モードでは自動計算欄を隠す（訂正対象のみ入力するため）
+  const hide = state.mode === "訂正";
+  document.getElementById("finalBox").style.visibility  = hide ? "hidden" : "visible";
+  document.getElementById("escoreBox").style.visibility = hide ? "hidden" : "visible";
+  document.getElementById("penBox").style.visibility    = hide ? "hidden" : "visible";
+}
+
+/* ================= 選手データ ================= */
+function loadPlayersFromCache(){
+  try{
+    const c = JSON.parse(localStorage.getItem("sc_players") || "null");
+    if(c && c.players){ players = c.players; showCacheInfo(c.time); return true; }
+  }catch(e){}
+  return false;
+}
+function showCacheInfo(t){
+  document.getElementById("cacheInfo").textContent =
+    t ? "選手データ取得: " + new Date(t).toLocaleString("ja-JP") : "";
+}
+async function fetchPlayers(force){
+  if(!GAS_URL) return;
+  if(!force && loadPlayersFromCache()){
+    const c = JSON.parse(localStorage.getItem("sc_players"));
+    if(Date.now() - c.time < 60*60*1000) return; // 1時間キャッシュ
+  }
+  try{
+    const res = await fetch(GAS_URL + "?action=players&token=" + encodeURIComponent(API_TOKEN));
+    const data = await res.json();
+    if(data.ok){
+      players = data.players;
+      localStorage.setItem("sc_players", JSON.stringify({time:Date.now(), players}));
+      showCacheInfo(Date.now());
+      lookupPlayer();
+    }
+  }catch(e){ /* オフライン時はキャッシュを使用 */ }
+}
+
+let currentPlayer = null;
+function lookupPlayer(){
+  const bib = document.getElementById("bib").value.trim();
+  const box  = document.getElementById("playerBox");
+  const nameEl = document.getElementById("playerName");
+  const teamEl = document.getElementById("playerTeam");
+  currentPlayer = null;
+  if(!bib){ box.className="player"; nameEl.textContent="選手名"; teamEl.textContent="所属（○○県）"; return; }
+  const p = (players[state.gender]||[]).find(x => String(x.bib) === bib);
+  if(p){
+    currentPlayer = p;
+    box.className = "player found";
+    nameEl.textContent = p.name;
+    teamEl.textContent = p.team + "（" + p.pref + "）";
+  }else{
+    box.className = "player notfound";
+    nameEl.textContent = "該当なし";
+    teamEl.textContent = "ゼッケンを確認してください";
+  }
+}
+
+/* ================= 計算 ================= */
+function num(id){
+  const v = document.getElementById(id).value;
+  return v === "" ? null : Number(v);
+}
+function r3(x){ return Math.round(x*1000)/1000; }
+
+function recalc(){
+  if(state.mode === "訂正") return;
+  const D = num("f_D") ?? 0, katen = num("f_katen") ?? 0, SB = num("f_SB") ?? 0;
+  const es = ["f_E1","f_E2","f_E3","f_E4"].map(id => num(id) ?? 0);
+  const sorted = [...es].sort((a,b)=>a-b);
+  const E = r3((sorted[1]+sorted[2]) / 2); // 上下カットの中央2つの平均
+  const pen = r3((num("f_shushin")??0)+(num("f_time")??0)+(num("f_line1")??0)+(num("f_line2")??0));
+  const final = r3(D + katen + SB + E - pen);
+  document.getElementById("escoreVal").textContent = fmt(E);
+  document.getElementById("penVal").textContent = fmt(pen);
+  document.getElementById("finalVal").textContent = final.toFixed(3);
+}
+function fmt(x){ // 8.05 のように末尾ゼロを2桁までに整える
+  return (Math.round(x*1000)/1000).toString();
+}
+
+/* ================= 送信 ================= */
+async function send(){
+  const bib = document.getElementById("bib").value.trim();
+  const st = document.getElementById("status");
+  st.className = ""; st.textContent = "";
+
+  if(!GAS_URL){ st.className="err"; st.textContent="GAS_URLが未設定です"; return; }
+  if(!bib){ st.className="err"; st.textContent="ゼッケンを入力してください"; return; }
+  if(!currentPlayer && !confirm("選手情報が見つかりません。このまま送信しますか？")) return;
+
+  const raw = {};
+  SCORE_IDS.forEach(id => raw[id.slice(2)] = num(id));
+
+  if(state.mode === "訂正"){
+    if(Object.values(raw).every(v => v === null)){
+      st.className="err"; st.textContent="訂正する項目を入力してください"; return;
+    }
+  }else{
+    // 入力モード：未入力は0.0として記録
+    Object.keys(raw).forEach(k => { if(raw[k] === null) raw[k] = 0; });
+  }
+
+  const payload = {
+    token: API_TOKEN,
+    gender: state.gender, event: state.event,
+    mode: state.mode === "入力" ? "入力" : "訂正",
+    bib: bib,
+    playerName: currentPlayer ? currentPlayer.name : "",
+    team: currentPlayer ? currentPlayer.team : "",
+    ...raw
+  };
+
+  const btn = document.getElementById("send");
+  btn.disabled = true; st.textContent = "送信中…";
+  try{
+    const res = await fetch(GAS_URL, {
+      method: "POST",
+      headers: {"Content-Type": "text/plain;charset=utf-8"}, // preflight回避
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(data.ok){
+      st.className="ok";
+      st.textContent = "送信しました（" + state.gender + " " + state.event + " ゼッケン" + bib + "）";
+      clearInputs();
+    }else{
+      st.className="err"; st.textContent = "エラー: " + (data.error || "不明");
+    }
+  }catch(e){
+    st.className="err"; st.textContent = "送信に失敗しました。通信環境を確認してください。";
+  }finally{
+    btn.disabled = false;
+  }
+}
+function clearInputs(){
+  SCORE_IDS.forEach(id => document.getElementById(id).value = "");
+  document.getElementById("bib").value = "";
+  lookupPlayer(); recalc();
+  document.getElementById("escoreVal").textContent = "-";
+  document.getElementById("penVal").textContent = "-";
+  document.getElementById("finalVal").textContent = "-";
+  document.getElementById("bib").focus();
+}
+
+/* ================= タッチ端末用テンキー ================= */
+const IS_TOUCH = window.matchMedia("(pointer: coarse)").matches;
+const FIELD_ORDER = ["bib", ...SCORE_IDS];
+let kpTarget = null;
+
+function kpSet(id){
+  if(kpTarget) document.getElementById(kpTarget).classList.remove("kfocus");
+  kpTarget = id;
+  const el = document.getElementById(id);
+  el.classList.add("kfocus");
+  document.body.classList.add("keypad-open");
+  if(el.scrollIntoView) el.scrollIntoView({block:"center", behavior:"smooth"});
+}
+function kpClose(){
+  if(kpTarget) document.getElementById(kpTarget).classList.remove("kfocus");
+  kpTarget = null;
+  document.body.classList.remove("keypad-open");
+}
+function kpApply(key){
+  if(!kpTarget) return;
+  const el = document.getElementById(kpTarget);
+  let v = el.value;
+  if(key === "bs")        v = v.slice(0, -1);
+  else if(key === "clear") v = "";
+  else if(key === "."){   if(kpTarget !== "bib" && !v.includes(".")) v += v === "" ? "0." : "."; }
+  else                    v += key; // 数字
+  el.value = v;
+  if(kpTarget === "bib") lookupPlayer(); else recalc();
+}
+function kpNext(){
+  const i = FIELD_ORDER.indexOf(kpTarget);
+  if(i >= 0 && i < FIELD_ORDER.length - 1) kpSet(FIELD_ORDER[i + 1]);
+  else kpClose();
+}
+function initKeypad(){
+  if(!IS_TOUCH) return;
+  // OSキーボードを出さず、タップでテンキーを開く
+  FIELD_ORDER.forEach(id => {
+    const el = document.getElementById(id);
+    el.type = "text"; // number型は"8."などの途中入力を弾くためtextに変更
+    el.readOnly = true;
+    el.setAttribute("inputmode", "none");
+    el.addEventListener("click", () => kpSet(id));
+  });
+  document.querySelectorAll("#keypad button").forEach(b => {
+    b.addEventListener("click", () => {
+      const k = b.dataset.k;
+      if(k === "close") kpClose();
+      else if(k === "next") kpNext();
+      else kpApply(k);
+    });
+  });
+  // 送信ボタンや欄外をタップしたら閉じるのは「閉じる」ボタンに委ねる
+  document.getElementById("send").addEventListener("click", kpClose);
+}
+
+/* ================= 初期化 ================= */
+document.getElementById("bib").addEventListener("input", lookupPlayer);
+SCORE_IDS.forEach(id => document.getElementById(id).addEventListener("input", recalc));
+document.getElementById("send").addEventListener("click", send);
+document.getElementById("reloadPlayers").addEventListener("click", ()=>fetchPlayers(true));
+if(!GAS_URL) document.getElementById("setup").style.display = "block";
+
+renderTabs();
+refreshContext();
+initKeypad();
+loadPlayersFromCache();
+fetchPlayers(false);
+</script>
+</body>
+</html>

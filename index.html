@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>採点入力</title>
+<title>得点修正・送信</title>
 <style>
   :root{
     --ink:#1a1a1a; --line:#333; --panel-blue:#dfe3f5; --panel-blue-ink:#3f51b5;
@@ -57,13 +57,26 @@
   .spacer{visibility:hidden;}
 
   /* 送信 */
-  #send{width:100%; margin-top:22px; padding:16px; font-size:22px; font-weight:bold;
+  #send{flex:1; padding:16px; font-size:22px; font-weight:bold;
     color:#fff; background:var(--btn); border:none; border-radius:4px; cursor:pointer;}
   #send:hover{background:var(--btn-hover);}
   #send:disabled{background:#aaa; cursor:not-allowed;}
+  #zeroFill{width:150px; padding:16px 10px; font-size:18px; font-weight:bold;
+    color:#333; background:#e0e0e0; border:1px solid #bbb; border-radius:4px; cursor:pointer;}
+  #zeroFill:hover{background:#d0d0d0;}
 
   #status{margin-top:10px; text-align:center; font-size:16px; min-height:24px;}
   #status.ok{color:var(--ok); font-weight:bold;} #status.err{color:var(--warn); font-weight:bold;}
+
+  /* 直近レコード表示 */
+  #lastRecord{display:none; margin-top:14px; border:1px solid #c9d3ee; border-radius:8px;
+    background:#f4f7ff; padding:12px 14px;}
+  #lastRecord .lr-head{font-size:13px; color:#5a6ba8; font-weight:bold; margin-bottom:8px;}
+  #lastRecord .lr-body{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:15px;}
+  #lastRecord .lr-item{white-space:nowrap;}
+  #lastRecord .lr-item b{color:#333;}
+  #lastRecord .lr-item .k{color:#888; font-size:12px; margin-right:3px;}
+  #lastRecord .lr-final{color:var(--final-bg); font-weight:bold;}
 
   .toolbar{display:flex; justify-content:flex-end; gap:10px; margin-top:14px; font-size:13px; color:#666;}
   .toolbar button{font-size:13px; padding:4px 10px; cursor:pointer;}
@@ -79,7 +92,8 @@
     .box .lbl{font-size:16px; padding:6px;}
     .box input, .box .val{min-height:64px;}
     #bib{height:84px;}
-    #send{padding:18px; font-size:24px; margin-top:14px;}
+    #send{padding:18px; font-size:24px;}
+    #zeroFill{font-size:19px;}
     .toolbar button{font-size:16px; padding:10px 16px;}
   }
   /* 縦持ちなど幅が狭い場合は文字を詰めてラベルの折返しを防ぐ */
@@ -119,8 +133,10 @@
 <body>
 
 <div id="setup">
-  Apps ScriptのウェブアプリURLが設定されていません。index.html内の <code>GAS_URL</code> にデプロイしたURL（…/exec）を貼り付けてください。
+  Apps ScriptのウェブアプリURLが設定されていません。index.html内の <code>https://docs.google.com/spreadsheets/d/1Hiks_UAkvCkNpfG8q4YI7e99LIyUxK9WlQSOb7wWkWA/edit?gid=262037427#gid=262037427</code> にデプロイしたURL（…/exec）を貼り付けてください。
 </div>
+
+<h1 style="font-size:19px; margin:0 0 8px;">得点修正・送信</h1>
 
 <!-- 性別タブ -->
 <div class="tabs" id="genderTabs"></div>
@@ -162,15 +178,20 @@
   </div>
 
   <div class="grid">
-    <div class="box"><div class="lbl">主審</div><input id="f_shushin" type="number" step="0.1" min="0"></div>
-    <div class="box"><div class="lbl">計時</div><input id="f_time" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">減点</div><input id="f_shushin" type="number" step="0.1" min="0"></div>
+    <div class="box"><div class="lbl">TIME</div><input id="f_time" type="number" step="0.1" min="0"></div>
     <div class="box"><div class="lbl">LINE1</div><input id="f_line1" type="number" step="0.1" min="0"></div>
     <div class="box"><div class="lbl">LINE2</div><input id="f_line2" type="number" step="0.1" min="0"></div>
     <div class="box calc pen" id="penBox"><div class="lbl" style="color:#333">ペナルティ</div><div class="val" id="penVal" style="color:#333">-</div></div>
   </div>
 
-  <button id="send">本部記録へ送信</button>
+  <div style="display:flex; gap:10px; margin-top:22px;">
+    <button id="zeroFill" type="button">0点処理</button>
+    <button id="send">本部記録へ送信</button>
+  </div>
   <div id="status"></div>
+
+  <div id="lastRecord"></div>
 
   <div class="toolbar">
     <span id="cacheInfo"></span>
@@ -197,8 +218,8 @@
    Apps Script をウェブアプリとしてデプロイし、
    URL（https://script.google.com/macros/s/XXXX/exec）を貼り付ける。
    API_TOKEN は Code.gs 側と同じ文字列を設定する（推測されにくい長い文字列に）。 */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbyk1FbQztLm9UzTeRTegSRkvVvyWSCuQu4a8u8cCFa91wKOPN-jM8Z7x5qz-kSfc8BE/exec";
-const API_TOKEN = "5f8a9e2d7c1b4a6d3f0e8c9b2a1d4f7e";
+const GAS_URL = "";
+const API_TOKEN = "";
 
 /* ================= 定数 ================= */
 const EVENTS = {
@@ -261,11 +282,27 @@ function refreshContext(){
   const badge = document.getElementById("modeBadge");
   badge.textContent = state.mode;
   badge.className = "mode-badge " + (state.mode==="入力" ? "input" : "correction");
-  // 訂正モードでは自動計算欄を隠す（訂正対象のみ入力するため）
+  // 訂正モードでは自動計算欄と0点処理を隠す（訂正対象のみ入力するため）
   const hide = state.mode === "訂正";
   document.getElementById("finalBox").style.visibility  = hide ? "hidden" : "visible";
   document.getElementById("escoreBox").style.visibility = hide ? "hidden" : "visible";
   document.getElementById("penBox").style.visibility    = hide ? "hidden" : "visible";
+  document.getElementById("zeroFill").style.display     = hide ? "none" : "block";
+}
+
+/* E1〜E4は小数第1位まで表示（8 → 8.0） */
+const E_IDS = ["f_E1","f_E2","f_E3","f_E4"];
+function formatEField(id){
+  const el = document.getElementById(id);
+  if(el.value !== "" && !isNaN(Number(el.value))) el.value = Number(el.value).toFixed(1);
+}
+
+/* 0点処理：全スコア欄に0を入れる（入力モード用） */
+function zeroFill(){
+  SCORE_IDS.forEach(id => {
+    document.getElementById(id).value = E_IDS.includes(id) ? "0.0" : "0";
+  });
+  recalc();
 }
 
 /* ================= 選手データ ================= */
@@ -277,10 +314,12 @@ function loadPlayersFromCache(){
   return false;
 }
 function showCacheInfo(t){
-  document.getElementById("cacheInfo").textContent =
-    t ? "選手データ取得: " + new Date(t).toLocaleString("ja-JP") : "";
+  const info = document.getElementById("cacheInfo");
+  info.style.color = "";
+  info.textContent = t ? "選手データ取得: " + new Date(t).toLocaleString("ja-JP") : "";
 }
 async function fetchPlayers(force){
+  const info = document.getElementById("cacheInfo");
   if(!GAS_URL) return;
   if(!force && loadPlayersFromCache()){
     const c = JSON.parse(localStorage.getItem("sc_players"));
@@ -294,8 +333,16 @@ async function fetchPlayers(force){
       localStorage.setItem("sc_players", JSON.stringify({time:Date.now(), players}));
       showCacheInfo(Date.now());
       lookupPlayer();
+    }else{
+      info.style.color = "#c0392b";
+      info.textContent = data.error === "unauthorized"
+        ? "選手データ取得エラー: トークン不一致（index.htmlとCode.gsのAPI_TOKENを確認）"
+        : "選手データ取得エラー: " + (data.error || "不明");
     }
-  }catch(e){ /* オフライン時はキャッシュを使用 */ }
+  }catch(e){
+    info.style.color = "#c0392b";
+    info.textContent = "選手データ取得失敗（GAS_URL・デプロイ設定を確認）";
+  }
 }
 
 let currentPlayer = null;
@@ -343,7 +390,9 @@ function fmt(x){ // 8.05 のように末尾ゼロを2桁までに整える
 }
 
 /* ================= 送信 ================= */
+let sending = false;
 async function send(){
+  if(sending) return; // 連打防止
   const bib = document.getElementById("bib").value.trim();
   const st = document.getElementById("status");
   st.className = ""; st.textContent = "";
@@ -375,7 +424,12 @@ async function send(){
   };
 
   const btn = document.getElementById("send");
-  btn.disabled = true; st.textContent = "送信中…";
+  sending = true;
+  btn.disabled = true;
+  document.getElementById("zeroFill").disabled = true;
+  const btnLabel = btn.textContent;
+  btn.textContent = "送信中、、、";
+  st.textContent = "送信中、、、";
   try{
     const res = await fetch(GAS_URL, {
       method: "POST",
@@ -386,6 +440,7 @@ async function send(){
     if(data.ok){
       st.className="ok";
       st.textContent = "送信しました（" + state.gender + " " + state.event + " ゼッケン" + bib + "）";
+      showLastRecord(payload); // 直近レコードを最下段に表示
       clearInputs();
     }else{
       st.className="err"; st.textContent = "エラー: " + (data.error || "不明");
@@ -393,8 +448,40 @@ async function send(){
   }catch(e){
     st.className="err"; st.textContent = "送信に失敗しました。通信環境を確認してください。";
   }finally{
+    sending = false;
     btn.disabled = false;
+    document.getElementById("zeroFill").disabled = false;
+    btn.textContent = btnLabel;
   }
+}
+function showLastRecord(p){
+  const box = document.getElementById("lastRecord");
+  const esc = s => String(s==null?"":s).replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+  const g = v => (v===null||v===undefined||v==="") ? "－" : v;
+
+  const items = [];
+  items.push(`<span class="lr-item"><span class="k">ゼッケン</span><b>${esc(p.bib)}</b></span>`);
+  if(p.playerName) items.push(`<span class="lr-item"><b>${esc(p.playerName)}</b></span>`);
+  items.push(`<span class="lr-item"><span class="k">種目</span>${esc(p.gender)} ${esc(p.event)}</span>`);
+  items.push(`<span class="lr-item"><span class="k">区分</span>${esc(p.mode)}</span>`);
+
+  const labels = {D:"D",katen:"加点",SB:"SB",E1:"E1",E2:"E2",E3:"E3",E4:"E4",shushin:"減点",time:"TIME",line1:"LINE1",line2:"LINE2"};
+  Object.keys(labels).forEach(k=>{
+    // 訂正モードは入力した項目のみ表示、入力モードは全項目
+    if(p.mode==="訂正" && (p[k]===null||p[k]===undefined||p[k]==="")) return;
+    items.push(`<span class="lr-item"><span class="k">${labels[k]}</span>${g(p[k])}</span>`);
+  });
+
+  // 入力モードは決定点も表示（画面の計算結果を流用）
+  if(p.mode==="入力"){
+    const fv = document.getElementById("finalVal").textContent;
+    items.push(`<span class="lr-item lr-final"><span class="k" style="color:inherit">決定点</span>${fv}</span>`);
+  }
+
+  const now = new Date().toLocaleTimeString("ja-JP");
+  box.innerHTML = `<div class="lr-head">直近の送信レコード（${now}）</div>`
+    + `<div class="lr-body">${items.join("")}</div>`;
+  box.style.display = "block";
 }
 function clearInputs(){
   SCORE_IDS.forEach(id => document.getElementById(id).value = "");
@@ -412,7 +499,10 @@ const FIELD_ORDER = ["bib", ...SCORE_IDS];
 let kpTarget = null;
 
 function kpSet(id){
-  if(kpTarget) document.getElementById(kpTarget).classList.remove("kfocus");
+  if(kpTarget){
+    document.getElementById(kpTarget).classList.remove("kfocus");
+    if(E_IDS.includes(kpTarget)) formatEField(kpTarget); // 欄を離れる時にE1〜E4を2桁整形
+  }
   kpTarget = id;
   const el = document.getElementById(id);
   el.classList.add("kfocus");
@@ -420,7 +510,11 @@ function kpSet(id){
   if(el.scrollIntoView) el.scrollIntoView({block:"center", behavior:"smooth"});
 }
 function kpClose(){
-  if(kpTarget) document.getElementById(kpTarget).classList.remove("kfocus");
+  if(kpTarget){
+    document.getElementById(kpTarget).classList.remove("kfocus");
+    if(E_IDS.includes(kpTarget)) formatEField(kpTarget);
+    recalc();
+  }
   kpTarget = null;
   document.body.classList.remove("keypad-open");
 }
@@ -465,6 +559,8 @@ function initKeypad(){
 /* ================= 初期化 ================= */
 document.getElementById("bib").addEventListener("input", lookupPlayer);
 SCORE_IDS.forEach(id => document.getElementById(id).addEventListener("input", recalc));
+E_IDS.forEach(id => document.getElementById(id).addEventListener("blur", ()=>{ formatEField(id); recalc(); }));
+document.getElementById("zeroFill").addEventListener("click", zeroFill);
 document.getElementById("send").addEventListener("click", send);
 document.getElementById("reloadPlayers").addEventListener("click", ()=>fetchPlayers(true));
 if(!GAS_URL) document.getElementById("setup").style.display = "block";

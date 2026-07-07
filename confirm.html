@@ -60,6 +60,16 @@
   .card.done{border-left:6px solid #bcc3cf; opacity:.72;}
   .card.corr{border-left:6px solid var(--corr);}
 
+  /* 種目バナー（男女・種目を大きく表示して一次認知を高める） */
+  .ev-banner{display:flex; align-items:baseline; gap:14px; padding:10px 18px;
+    color:#fff; background:#556; }
+  .ev-banner.m{background:linear-gradient(90deg,#1e63c4,#2f7de0);}   /* 男子：青 */
+  .ev-banner.w{background:linear-gradient(90deg,#c43570,#e0508f);}   /* 女子：赤系 */
+  .ev-banner .ev-gender{font-size:20px; font-weight:bold; padding:1px 12px;
+    background:rgba(255,255,255,.22); border-radius:6px; letter-spacing:1px;}
+  .ev-banner .ev-name{font-size:26px; font-weight:800; letter-spacing:1px;}
+  .card.done .ev-banner{filter:grayscale(.55);}
+
   .card-head{display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f6f7f9; flex-wrap:wrap;}
   .bib{font-size:26px; font-weight:bold; min-width:56px; text-align:center; color:#333;}
   .who{flex:1; min-width:180px;}
@@ -67,7 +77,6 @@
   .who .sub{font-size:13px; color:#666; margin-top:2px;}
   .tags{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
   .tag{font-size:12px; font-weight:bold; padding:2px 10px; border-radius:12px;}
-  .tag.ev{background:#e7ecf7; color:#3f51b5;}
   .tag.in{background:#d7f0c8; color:#3a6b1e;}
   .tag.co{background:#ffe9b0; color:#8a5a00;}
   .tstamp{font-size:12px; color:#999;}
@@ -203,7 +212,7 @@ function fld(cls, label, rawVal){
 
 function renderCard(r){
   const cls = (r.reflected ? "done" : "new") + (r.mode==="訂正" ? " corr" : "");
-  const evTag = `<span class="tag ev">${esc(r.gender)} ${esc(r.event)}</span>`;
+  const gcls = r.gender === "男子" ? "m" : (r.gender === "女子" ? "w" : "");
   const modeTag = r.mode==="入力"
     ? '<span class="tag in">入力</span>'
     : '<span class="tag co">訂正</span>';
@@ -223,13 +232,17 @@ function renderCard(r){
     : `<span class="final">決定点<b>${f.toFixed(3)}</b></span>`;
 
   return `<div class="card ${cls}">
+    <div class="ev-banner ${gcls}">
+      <span class="ev-gender">${esc(r.gender)}</span>
+      <span class="ev-name">${esc(r.event)}</span>
+    </div>
     <div class="card-head">
       <div class="bib">${esc(r.bib)}</div>
       <div class="who">
         <div class="nm">${esc(r.playerName) || "（選手名なし）"}</div>
         <div class="sub">${esc(r.team)}</div>
       </div>
-      <div class="tags">${evTag}${modeTag}<span class="tstamp">${fmtTime(r.ts)}</span></div>
+      <div class="tags">${modeTag}<span class="tstamp">${fmtTime(r.ts)}</span></div>
     </div>
     <div class="card-body">
       <div class="col left">${left}</div>
@@ -239,7 +252,7 @@ function renderCard(r){
       ${finalHtml}
       <label class="reflect-lbl">
         <input type="checkbox" data-row="${r.row}" ${r.reflected?"checked":""}>
-        ${r.reflected ? "反映済み" : "反映する"}
+        ${r.reflected ? "入力済み" : "入力済みにする"}
       </label>
     </div>
   </div>`;

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>入力確認・訂正反映</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --btn:#4d79e6; --btn-hover:#3a63cc; --ok:#2e7d32; --warn:#c0392b;
+    --sheet:#188038; --sheet-hover:#0f6b2c;
+    --d-bg:#fbeceb; --d-line:#e6b8b3;
+    --pen-bg:#e5f7f7; --pen-line:#b6e2e2;
+    --calc-bg:#eceef7; --calc-line:#c9cfe8;
+    --corr:#e6a817;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Hiragino Sans",Meiryo,sans-serif;
+    color:var(--ink); background:#f2f3f5;}
+  .wrap{max-width:1180px; margin:0 auto; padding:16px;}
+
+  .topbar{background:#2b2f3a; color:#fff; padding:12px 20px; position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .topbar h1{font-size:17px; font-weight:bold; margin-right:auto;}
+  .sheet-btn{background:var(--sheet); color:#fff; text-decoration:none; font-weight:bold;
+    padding:9px 16px; border-radius:6px; font-size:14px;}
+  .sheet-btn:hover{background:var(--sheet-hover);}
+  .rbtn{background:var(--btn); color:#fff; border:none; padding:9px 16px; border-radius:6px;
+    font-size:14px; cursor:pointer; font-weight:bold;}
+  .rbtn:hover{background:var(--btn-hover);}
+
+  .bar{display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:14px; color:#555;}
+  .bar label{display:inline-flex; align-items:center; gap:5px; cursor:pointer;}
+  .bar select{font-size:14px; padding:2px 4px;}
+  .counts{display:flex; gap:8px;}
+  .chip{padding:3px 12px; border-radius:14px; font-size:13px; font-weight:bold;}
+  .chip.new{background:#fff8e1; border:1px solid #f0c040; color:#9a6b00;}
+  .chip.done{background:#f2f5f2; border:1px solid #ccc; color:#666;}
+  .chip.fold{background:#e8eefc; border:1px solid #b9caf0; color:#3f51b5;}
+  #updated{margin-left:auto; color:#888; font-size:12px;}
+
+  #msg{min-height:20px; margin-bottom:10px; font-size:14px;}
+  #msg.err{color:var(--warn); font-weight:bold;} #msg.ok{color:var(--ok);}
+  .copyhint{font-size:12px; color:#999; margin-bottom:10px;}
+
+  #foldedArea{margin-bottom:14px;}
+  .fold-toggle{width:100%; text-align:left; background:#e7ebf3; border:1px solid #d5dced;
+    color:#4a5a92; padding:10px 14px; border-radius:8px; cursor:pointer; font-size:14px; font-weight:bold;}
+  .fold-toggle:hover{background:#dde3ef;}
+  .fold-toggle .arrow{display:inline-block; transition:transform .15s; margin-right:6px;}
+  .fold-toggle.open .arrow{transform:rotate(90deg);}
+  #foldedList{margin-top:10px; display:none;}
+  #foldedList.open{display:block;}
+
+  .grp-head{background:#3f51b5; color:#fff; font-weight:bold; font-size:14px;
+    padding:8px 14px; border-radius:6px; margin:16px 0 8px;}
+
+  .card{background:#fff; border:1px solid #e2e5ea; border-radius:10px; margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden;}
+  .card.new{border-left:6px solid #f0c040;}
+  .card.done{border-left:6px solid #bcc3cf; opacity:.72;}
+  .card.corr{border-left:6px solid var(--corr);}
+
+  .card-head{display:flex; align-items:center; gap:12px; padding:12px 16px; background:#f6f7f9; flex-wrap:wrap;}
+  .bib{font-size:26px; font-weight:bold; min-width:56px; text-align:center; color:#333;}
+  .who{flex:1; min-width:180px;}
+  .who .nm{font-size:19px; font-weight:bold;}
+  .who .sub{font-size:13px; color:#666; margin-top:2px;}
+  .tags{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+  .tag{font-size:12px; font-weight:bold; padding:2px 10px; border-radius:12px;}
+  .tag.ev{background:#e7ecf7; color:#3f51b5;}
+  .tag.in{background:#d7f0c8; color:#3a6b1e;}
+  .tag.co{background:#ffe9b0; color:#8a5a00;}
+  .tstamp{font-size:12px; color:#999;}
+
+  .card-body{display:grid; grid-template-columns:1fr 1fr; gap:0;}
+  @media (max-width:720px){ .card-body{grid-template-columns:1fr;} .col.right{border-left:none; border-top:1px solid #eee;} }
+  .col{padding:10px 16px;}
+  .col.right{border-left:1px solid #eee;}
+
+  .fld{display:flex; align-items:stretch; margin-bottom:8px; border:1px solid #dcdfe4;
+    border-radius:6px; overflow:hidden; cursor:pointer; background:#fff;}
+  .fld:hover{border-color:var(--btn);}
+  .fld .k{width:130px; flex:none; display:flex; align-items:center; padding:0 12px;
+    font-size:13px; font-weight:bold; color:#444; background:#f4f5f7; border-right:1px solid #e4e6ea;}
+  .fld .v{flex:1; display:flex; align-items:center; justify-content:flex-end;
+    padding:0 14px; height:42px; font-size:18px; font-variant-numeric:tabular-nums;}
+  .fld .v.empty{color:#c2c2c2;}
+  .fld.d .k{background:var(--d-bg); border-color:var(--d-line);}
+  .fld.d{border-color:var(--d-line);}
+  .fld.pen .k{background:var(--pen-bg); border-color:var(--pen-line);}
+  .fld.pen{border-color:var(--pen-line);}
+  .fld.calc .k{background:var(--calc-bg); border-color:var(--calc-line);}
+  .fld.calc{border-color:var(--calc-line);}
+  .fld.copied{outline:2px solid var(--ok); outline-offset:-2px;}
+  .fld.copied .v::after{content:" ✓"; color:var(--ok); font-size:14px; font-weight:bold; margin-left:6px;}
+
+  .card-foot{display:flex; align-items:center; gap:16px; padding:10px 16px; border-top:1px solid #eee;
+    background:#fafbfc; flex-wrap:wrap;}
+  .final{font-size:15px;}
+  .final b{font-size:22px; color:#b23a2a; margin-left:6px; font-variant-numeric:tabular-nums;}
+  .reflect-lbl{margin-left:auto; display:inline-flex; align-items:center; gap:8px;
+    font-size:15px; font-weight:bold; cursor:pointer; padding:6px 14px; border-radius:8px;
+    border:1px solid #cfd6e4; background:#fff;}
+  .reflect-lbl input{width:22px; height:22px; cursor:pointer;}
+  .card.done .reflect-lbl{background:#eef4ee; border-color:#bcd3bc; color:#3a6b3a;}
+
+  .empty{text-align:center; color:#999; padding:50px; background:#fff; border-radius:10px;}
+  #setup{background:#fff3cd; border:1px solid #e0c96a; padding:12px; border-radius:6px; margin:16px; font-size:14px; display:none;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1 id="pageTitle">入力確認・訂正反映</h1>
+  <a id="sheetLink" class="sheet-btn" href="#" target="_blank" rel="noopener">スプレッドシートを開く</a>
+  <button id="reload" class="rbtn">更新</button>
+</div>
+
+<div id="setup">GAS_URL / API_TOKEN が未設定です。confirm.html 冒頭の設定を確認してください。</div>
+
+<div class="wrap">
+  <div class="bar">
+    <label><input type="checkbox" id="onlyNew"> 未反映のみ表示</label>
+    <label><input type="checkbox" id="autoReload" checked> 自動更新（15秒）</label>
+    <label>グループ:
+      <select id="groupBy">
+        <option value="none">なし（時系列）</option>
+        <option value="event">種目ごと</option>
+      </select>
+    </label>
+    <label>反映済を折りたたむ:
+      <select id="foldDelay">
+        <option value="0">しない</option>
+        <option value="30">30秒後</option>
+        <option value="60" selected>1分後</option>
+        <option value="180">3分後</option>
+        <option value="600">10分後</option>
+      </select>
+    </label>
+    <div class="counts">
+      <span class="chip new" id="cNew">未反映 0</span>
+      <span class="chip done" id="cDone">反映済 0</span>
+      <span class="chip fold" id="cFold" style="display:none;"></span>
+    </div>
+    <span id="updated"></span>
+  </div>
+
+  <div class="copyhint">値をクリックすると、その数値をコピーできます（転記先システムへ貼り付け可能）。</div>
+  <div id="msg"></div>
+  <div id="foldedArea"></div>
+  <div id="listArea"></div>
+</div>
+
+<script>
+/* ===== 設定（index.html と同じ値を入れる） ===== */
+const GAS_URL = "";
+const API_TOKEN = "";
+
+const EVENT_ORDER = {
+  "男子": ["ゆか","あん馬","つり輪","跳馬","平行棒","鉄棒"],
+  "女子": ["跳馬１本目","跳馬２本目","段違い平行棒","平均台","ゆか"]
+};
+
+let records = [];
+let busy = false;
+let timer = null;
+let foldTick = null;
+let foldedOpen = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const REFLECT_AT_KEY = "confirm_reflectAt";
+let reflectAt = {};
+try{ reflectAt = JSON.parse(localStorage.getItem(REFLECT_AT_KEY) || "{}"); }catch(e){ reflectAt = {}; }
+function saveReflectAt(){ localStorage.setItem(REFLECT_AT_KEY, JSON.stringify(reflectAt)); }
+
+function toNum(v){ return (v===""||v==null||isNaN(Number(v))) ? null : Number(v); }
+function disp3(v){ const n = toNum(v); return n==null ? null : n.toFixed(3); }
+
+function finalOf(r){
+  if(r.mode !== "入力") return null;
+  const n = v => toNum(v) ?? 0;
+  const es = [r.E1,r.E2,r.E3,r.E4].map(n).sort((a,b)=>a-b);
+  const E = (es[1]+es[2])/2;
+  const pen = n(r.shushin)+n(r.time)+n(r.line1)+n(r.line2);
+  return n(r.D)+n(r.katen)+n(r.SB)+E-pen;
+}
+function fmtTime(ts){
+  if(!ts) return "";
+  return new Date(ts).toLocaleString("ja-JP",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+}
+function foldSeconds(){ return Number($("foldDelay").value) || 0; }
+
+function fld(cls, label, rawVal){
+  const d = disp3(rawVal);
+  const shown = d==null ? "－" : d;
+  const copy  = d==null ? "" : d;
+  const vcls = "v" + (d==null ? " empty" : "");
+  return `<div class="fld ${cls}" data-copy="${esc(copy)}">`
+       + `<div class="k">${esc(label)}</div><div class="${vcls}">${esc(shown)}</div></div>`;
+}
+
+function renderCard(r){
+  const cls = (r.reflected ? "done" : "new") + (r.mode==="訂正" ? " corr" : "");
+  const evTag = `<span class="tag ev">${esc(r.gender)} ${esc(r.event)}</span>`;
+  const modeTag = r.mode==="入力"
+    ? '<span class="tag in">入力</span>'
+    : '<span class="tag co">訂正</span>';
+
+  const left = fld("d","D",r.D)
+    + fld("","E1",r.E1) + fld("","E2",r.E2) + fld("","E3",r.E3) + fld("","E4",r.E4);
+  const right = fld("pen","PEN.（LINE1）",r.line1)
+    + fld("pen","PEN.（LINE2）",r.line2)
+    + fld("pen","PEN.（TIME）",r.time)
+    + fld("pen","PEN.（主審）",r.shushin)
+    + fld("calc","加点（SB以外）",r.katen)
+    + fld("calc","Stick Bonus",r.SB);
+
+  const f = finalOf(r);
+  const finalHtml = f==null
+    ? '<span class="final">決定点<b>－</b></span>'
+    : `<span class="final">決定点<b>${f.toFixed(3)}</b></span>`;
+
+  return `<div class="card ${cls}">
+    <div class="card-head">
+      <div class="bib">${esc(r.bib)}</div>
+      <div class="who">
+        <div class="nm">${esc(r.playerName) || "（選手名なし）"}</div>
+        <div class="sub">${esc(r.team)}</div>
+      </div>
+      <div class="tags">${evTag}${modeTag}<span class="tstamp">${fmtTime(r.ts)}</span></div>
+    </div>
+    <div class="card-body">
+      <div class="col left">${left}</div>
+      <div class="col right">${right}</div>
+    </div>
+    <div class="card-foot">
+      ${finalHtml}
+      <label class="reflect-lbl">
+        <input type="checkbox" data-row="${r.row}" ${r.reflected?"checked":""}>
+        ${r.reflected ? "反映済み" : "反映する"}
+      </label>
+    </div>
+  </div>`;
+}
+
+function bindCards(container){
+  container.querySelectorAll('.fld[data-copy]').forEach(el=>{
+    el.addEventListener("click", ()=>{
+      const val = el.dataset.copy;
+      if(!val) return;
+      copyText(val, el);
+    });
+  });
+  container.querySelectorAll('input[type="checkbox"][data-row]').forEach(cb=>{
+    cb.addEventListener("change", ()=>toggleReflect(cb));
+  });
+}
+
+function copyText(text, el){
+  const done = ()=>{ el.classList.add("copied"); setTimeout(()=>el.classList.remove("copied"), 900); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text, done));
+  }else{ fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done){
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); done(); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+async function load(){
+  const msg = $("msg");
+  if(!GAS_URL || !API_TOKEN){ $("setup").style.display="block"; return; }
+  msg.className=""; msg.textContent="読み込み中…";
+  try{
+    const res = await fetch(GAS_URL + "?action=records&token=" + encodeURIComponent(API_TOKEN) + "&limit=300");
+    const data = await res.json();
+    if(!data.ok){ msg.className="err"; msg.textContent="取得エラー: " + (data.error||"不明"); return; }
+    records = data.records || [];
+    if(data.sheetUrl) $("sheetLink").href = data.sheetUrl;
+    $("updated").textContent = "最終更新 " + new Date().toLocaleTimeString("ja-JP");
+    msg.textContent="";
+    render();
+  }catch(e){
+    msg.className="err"; msg.textContent="取得失敗（GAS_URL・デプロイ設定を確認）";
+  }
+}
+
+function render(){
+  const onlyNew = $("onlyNew").checked;
+  const groupBy = $("groupBy").value;
+  const foldSec = foldSeconds();
+  const now = Date.now();
+
+  const total = records.length;
+  const doneCount = records.filter(r=>r.reflected).length;
+  $("cNew").textContent  = "未反映 " + (total - doneCount);
+  $("cDone").textContent = "反映済 " + doneCount;
+
+  const shouldFold = r => {
+    if(!r.reflected || foldSec <= 0) return false;
+    const t = reflectAt[r.row];
+    if(!t) return true;
+    return (now - t) >= foldSec * 1000;
+  };
+
+  let rows = records.slice();
+  const foldedRows = onlyNew ? [] : rows.filter(shouldFold);
+  rows = rows.filter(r => !shouldFold(r));
+  if(onlyNew) rows = rows.filter(r=>!r.reflected);
+
+  renderFolded(foldedRows);
+
+  const area = $("listArea");
+  if(!rows.length){
+    area.innerHTML = '<div class="empty">'
+      + (onlyNew ? "未反映のレコードはありません。" : "表示するレコードがありません。") + '</div>';
+    return;
+  }
+
+  if(groupBy === "event"){
+    const key = r => r.gender + " " + r.event;
+    const order = [];
+    ["男子","女子"].forEach(g => EVENT_ORDER[g].forEach(ev => order.push(g+" "+ev)));
+    const groups = {};
+    rows.forEach(r => { (groups[key(r)] = groups[key(r)]||[]).push(r); });
+    let html = "";
+    const emit = k => {
+      html += `<div class="grp-head">${esc(k)}（${groups[k].length}件）</div>`;
+      html += groups[k].map(renderCard).join("");
+    };
+    const seen = new Set();
+    order.forEach(k => { if(groups[k]){ seen.add(k); emit(k); } });
+    Object.keys(groups).forEach(k => { if(!seen.has(k)) emit(k); });
+    area.innerHTML = html;
+  }else{
+    area.innerHTML = rows.map(renderCard).join("");
+  }
+  bindCards(area);
+}
+
+function renderFolded(foldedRows){
+  const area = $("foldedArea");
+  const chip = $("cFold");
+  if(!foldedRows.length){ area.innerHTML=""; chip.style.display="none"; return; }
+  chip.style.display=""; chip.textContent = "折りたたみ " + foldedRows.length;
+  area.innerHTML =
+    `<button class="fold-toggle${foldedOpen?" open":""}" id="foldToggle">`
+    + `<span class="arrow">▶</span>反映済みで折りたたみ中（${foldedRows.length}件）</button>`
+    + `<div id="foldedList"${foldedOpen?' class="open"':''}>${foldedRows.map(renderCard).join("")}</div>`;
+  $("foldToggle").addEventListener("click", ()=>{
+    foldedOpen = !foldedOpen;
+    $("foldToggle").classList.toggle("open", foldedOpen);
+    $("foldedList").classList.toggle("open", foldedOpen);
+  });
+  bindCards($("foldedList"));
+}
+
+async function toggleReflect(cb){
+  if(busy){ cb.checked = !cb.checked; return; }
+  const row = Number(cb.dataset.row);
+  const reflected = cb.checked;
+  busy = true; cb.disabled = true;
+  const msg = $("msg"); msg.className=""; msg.textContent="更新中…";
+  try{
+    const res = await fetch(GAS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify({token:API_TOKEN, action:"markReflected", row:row, reflected:reflected})
+    });
+    const data = await res.json();
+    if(data.ok){
+      const rec = records.find(r=>r.row===row);
+      if(rec) rec.reflected = reflected;
+      if(reflected){ reflectAt[row] = Date.now(); } else { delete reflectAt[row]; }
+      saveReflectAt();
+      msg.className="ok"; msg.textContent = reflected ? "反映済みにしました" : "未反映に戻しました";
+      render();
+    }else{
+      cb.checked = !reflected; msg.className="err"; msg.textContent="更新エラー: "+(data.error||"不明");
+    }
+  }catch(e){
+    cb.checked = !reflected; msg.className="err"; msg.textContent="更新に失敗しました";
+  }finally{
+    busy = false;
+  }
+}
+
+function setAutoReload(){
+  if(timer){ clearInterval(timer); timer=null; }
+  if($("autoReload").checked) timer = setInterval(load, 15000);
+}
+function setFoldTick(){
+  if(foldTick){ clearInterval(foldTick); foldTick=null; }
+  if(foldSeconds() > 0) foldTick = setInterval(render, 5000);
+}
+
+$("reload").addEventListener("click", load);
+$("onlyNew").addEventListener("change", render);
+$("groupBy").addEventListener("change", render);
+$("foldDelay").addEventListener("change", ()=>{ setFoldTick(); render(); });
+$("autoReload").addEventListener("change", setAutoReload);
+if(!GAS_URL || !API_TOKEN) $("setup").style.display="block";
+setAutoReload();
+setFoldTick();
+load();
+</script>
+</body>
+</html>

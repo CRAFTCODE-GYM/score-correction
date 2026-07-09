@@ -25,6 +25,8 @@
   .tabs .tab{padding:8px 22px; border:1px solid #bbb; background:#fff; cursor:pointer;
     border-radius:6px 6px 0 0; font-size:15px; user-select:none;}
   .tabs .tab.active{background:var(--btn); color:#fff; border-color:var(--btn); font-weight:bold;}
+  .box.kp-active{outline:3px solid #0b7bef; outline-offset:1px;}
+  .box.kp-active .lbl{background:#0b7bef; color:#fff;}
   .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#111;}
 
   .card{background:#fff; border:1px solid #ddd; border-radius:8px; padding:20px; margin-top:6px;}
@@ -125,6 +127,8 @@
   .kp-player{font-size:18px; font-weight:bold;}
   .kp-sub{font-size:12px; color:#888; margin-top:2px;}
   .kp-field{font-size:16px; font-weight:bold; margin-top:6px;}
+  .kp-field.is-e{font-size:19px; color:#fff; background:#0b7bef; border-radius:8px;
+    padding:6px 10px; display:inline-block;}
   .kp-range{font-size:12px; color:#888; margin-top:2px; min-height:15px;}
   .kp-hr{border:none; border-top:1px solid #ddd; margin:10px 0;}
   .kp-display{border:2px solid var(--btn); background:#f4f6f8; border-radius:8px;
@@ -135,7 +139,8 @@
     cursor:pointer; color:#fff; background:#0b7bef;}
   .kp-grid button:active{filter:brightness(.85);}
   .kp-grid .num{grid-column:span 4;}
-  .kp-grid .b3{grid-column:span 3;}
+  .kp-grid .b6{grid-column:span 4;}
+  .kp-grid .dot{grid-column:span 12;}
   .kp-grid .next{background:var(--next); font-size:18px;}
   .kp-grid .next:active{background:var(--next-press);}
   .kp-grid .bs{background:#e23b3b;}
@@ -232,10 +237,10 @@
       <button type="button" class="num" data-k="1">1</button>
       <button type="button" class="num" data-k="2">2</button>
       <button type="button" class="num" data-k="3">3</button>
-      <button type="button" class="b3" data-k=".">.</button>
-      <button type="button" class="b3" data-k="0">0</button>
-      <button type="button" class="b3 next" data-k="next">次へ</button>
-      <button type="button" class="b3 bs" data-k="bs">⌫</button>
+      <button type="button" class="num" data-k="0">0</button>
+      <button type="button" class="b6 next" data-k="next">次へ</button>
+      <button type="button" class="b6 bs" data-k="bs">⌫</button>
+      <button type="button" class="num dot" data-k=".">.</button>
     </div>
     <button type="button" id="kpDone">決定</button>
   </div>
@@ -249,7 +254,8 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbyk1FbQztLm9UzTeRTegSRk
 const API_TOKEN = "5f8a9e2d7c1b4a6d3f0e8c9b2a1d4f7e";
 
 /* ================= 定数 ================= */
-const EVENTS = {
+// 種目は設定シートの4行目(男子)・5行目(女子)から取得する。取得前は既定値を使う。
+let EVENTS = {
   "男子": ["ゆか","あん馬","つり輪","跳馬","平行棒","鉄棒"],
   "女子": ["跳馬１本目","跳馬２本目","段違い平行棒","平均台","ゆか"]
 };
@@ -421,9 +427,21 @@ async function fetchPlayers(force){
     info.textContent = "選手データ取得失敗（GAS_URL・デプロイ設定を確認）";
   }
 }
+function applyEventsFromSettings(){
+  if(settings.eventsM && settings.eventsM.length) EVENTS["男子"] = settings.eventsM;
+  if(settings.eventsW && settings.eventsW.length) EVENTS["女子"] = settings.eventsW;
+  // 現在選択中の種目が新リストに無ければ先頭に寄せる
+  if(!EVENTS[state.gender].includes(state.event)){
+    state.event = EVENTS[state.gender][0];
+    saveState();
+  }
+}
 function afterSettings(){
+  applyEventsFromSettings();
   applySettingsToHeader();
+  renderTabs();
   buildERow();
+  refreshContext();
   recalc();
 }
 
@@ -470,13 +488,21 @@ function calcE(values){
   return trunc3((sorted[1]+sorted[2]+sorted[3])/3);
 }
 
-function recalc(){
-  if(state.mode === "訂正") return;
+/* 決定点を計算して返す（入力モード用、表示は更新しない） */
+function computeFinal(){
   const D = num("f_D") ?? 0, katen = num("f_katen") ?? 0, SB = num("f_SB") ?? 0;
   const es = eIds().map(id => num(id) ?? 0);
   const E = calcE(es);
   const pen = r3((num("f_shushin")??0)+(num("f_time")??0)+(num("f_line1")??0)+(num("f_line2")??0));
-  const final = r3(D + katen + SB + E - pen);
+  return r3(D + katen + SB + E - pen);
+}
+
+function recalc(){
+  if(state.mode === "訂正") return;
+  const es = eIds().map(id => num(id) ?? 0);
+  const E = calcE(es);
+  const pen = r3((num("f_shushin")??0)+(num("f_time")??0)+(num("f_line1")??0)+(num("f_line2")??0));
+  const final = computeFinal();
   const escoreEl = document.getElementById("escoreVal");
   if(escoreEl) escoreEl.textContent = fmt(E);
   document.getElementById("penVal").textContent = fmt(pen);
@@ -522,6 +548,13 @@ async function send(){
     }
   }else{
     scoreIds().forEach(id => { const k=id.slice(2); if(raw[k] === null) raw[k] = 0; });
+    // 決定点がマイナスのまま保存されないようにする
+    const finalScore = computeFinal();
+    if(finalScore !== null && finalScore < 0){
+      st.className="err";
+      st.textContent="決定点がマイナスです（" + finalScore.toFixed(3) + "）。入力値を確認してください。";
+      return;
+    }
   }
 
   const payload = {
@@ -612,9 +645,15 @@ let kpClosing = false;
 
 function kpOpen(id){
   kpFormatIfE();
+  // 直前の欄のハイライトを消す
+  document.querySelectorAll(".box.kp-active").forEach(el=>el.classList.remove("kp-active"));
   kpTarget = id;
   updateKpHead();
-  document.getElementById("kpDisplay").textContent = document.getElementById(id).value;
+  // 入力中の欄をフォーム上でも強調
+  const inp = document.getElementById(id);
+  const box = inp.closest(".box");
+  if(box) box.classList.add("kp-active");
+  document.getElementById("kpDisplay").textContent = inp.value;
   document.getElementById("kpOverlay").classList.add("open");
 }
 function updateKpHead(){
@@ -633,6 +672,15 @@ function updateKpHead(){
   }
   document.getElementById("kpField").textContent = FIELD_LABELS[kpTarget] || "";
   document.getElementById("kpRange").textContent = RANGE_HINTS[kpTarget] || "";
+  // E欄なら「E2（2人目 / 全4審判）」のように審判位置を強調表示
+  const fEl = document.getElementById("kpField");
+  fEl.classList.remove("is-e");
+  if(kpTarget && kpTarget.startsWith("f_E")){
+    const n = Number(kpTarget.slice(3));       // 1..5
+    const total = judgeCount();
+    fEl.textContent = FIELD_LABELS[kpTarget] + "　（" + n + "人目 / 全" + total + "審判）";
+    fEl.classList.add("is-e");
+  }
 }
 function kpFormatIfE(){
   if(kpTarget && kpTarget.startsWith("f_E")) formatEField(kpTarget);
@@ -645,6 +693,7 @@ function kpClose(){
   kpClosing = true;
   const ov = document.getElementById("kpOverlay");
   ov.classList.add("closing"); // 透明化しつつクリックを吸収（ゴーストクリック対策）
+  document.querySelectorAll(".box.kp-active").forEach(el=>el.classList.remove("kp-active"));
   setTimeout(()=>{ ov.classList.remove("open","closing"); kpClosing = false; }, 320);
 }
 function kpApply(key){
@@ -714,7 +763,11 @@ buildERow();
 refreshContext();
 initKeypad();
 loadPlayersFromCache();
+applyEventsFromSettings();
 applySettingsToHeader();
+renderTabs();
+buildERow();
+refreshContext();
 fetchPlayers(false);
 </script>
 </body>

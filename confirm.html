@@ -176,7 +176,7 @@
 const GAS_URL = "https://script.google.com/macros/s/AKfycbyk1FbQztLm9UzTeRTegSRkvVvyWSCuQu4a8u8cCFa91wKOPN-jM8Z7x5qz-kSfc8BE/exec";
 const API_TOKEN = "5f8a9e2d7c1b4a6d3f0e8c9b2a1d4f7e";
 
-const EVENT_ORDER = {
+let EVENT_ORDER = {
   "男子": ["ゆか","あん馬","つり輪","跳馬","平行棒","鉄棒"],
   "女子": ["跳馬１本目","跳馬２本目","段違い平行棒","平均台","ゆか"]
 };
@@ -354,6 +354,8 @@ async function load(){
     if(data.sheetUrl) $("sheetLink").href = data.sheetUrl;
     if(data.settings){
       settings = data.settings;
+      if(settings.eventsM && settings.eventsM.length) EVENT_ORDER["男子"] = settings.eventsM;
+      if(settings.eventsW && settings.eventsW.length) EVENT_ORDER["女子"] = settings.eventsW;
       if(settings.title){
         $("pageTitle").textContent = settings.title + "　入力確認・訂正反映";
         document.title = settings.title + " 入力確認・訂正反映";

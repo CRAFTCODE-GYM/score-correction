@@ -198,11 +198,29 @@ function saveReflectAt(){ localStorage.setItem(REFLECT_AT_KEY, JSON.stringify(re
 function toNum(v){ return (v===""||v==null||isNaN(Number(v))) ? null : Number(v); }
 function disp3(v){ const n = toNum(v); return n==null ? null : n.toFixed(3); }
 
+let settings = { title:"", judgesM:4, judgesW:4 };
+function judgesFor(gender){
+  const n = gender === "男子" ? settings.judgesM : settings.judgesW;
+  return (n>=1 && n<=5) ? n : 4;
+}
+function trunc3(x){ return Math.floor(x*1000 + 1e-9)/1000; }
+function calcE(values){
+  const n = values.length;
+  const s = [...values].sort((a,b)=>a-b);
+  if(n === 1) return s[0];
+  if(n === 2) return (s[0]+s[1])/2;
+  if(n === 3) return trunc3((s[0]+s[1]+s[2])/3);
+  if(n === 4) return (s[1]+s[2])/2;
+  return trunc3((s[1]+s[2]+s[3])/3); // n=5
+}
+
 function finalOf(r){
   if(r.mode !== "入力") return null;
   const n = v => toNum(v) ?? 0;
-  const es = [r.E1,r.E2,r.E3,r.E4].map(n).sort((a,b)=>a-b);
-  const E = (es[1]+es[2])/2;
+  const jc = judgesFor(r.gender);
+  const es = [];
+  for(let i=1;i<=jc;i++) es.push(n(r["E"+i]));
+  const E = calcE(es);
   const pen = n(r.shushin)+n(r.time)+n(r.line1)+n(r.line2);
   return n(r.D)+n(r.katen)+n(r.SB)+E-pen;
 }
@@ -228,8 +246,9 @@ function renderCard(r){
     ? '<span class="tag in">入力</span>'
     : '<span class="tag co">訂正</span>';
 
-  const left = fld("d","D",r.D)
-    + fld("","E1",r.E1) + fld("","E2",r.E2) + fld("","E3",r.E3) + fld("","E4",r.E4);
+  const jc = judgesFor(r.gender);
+  let left = fld("d","D",r.D);
+  for(let i=1;i<=jc;i++) left += fld("","E"+i, r["E"+i]);
   const right = fld("pen","PEN.（LINE1）",r.line1)
     + fld("pen","PEN.（LINE2）",r.line2)
     + fld("pen","PEN.（TIME）",r.time)
@@ -333,6 +352,13 @@ async function load(){
     if(!data.ok){ msg.className="err"; msg.textContent="取得エラー: " + (data.error||"不明"); return; }
     records = data.records || [];
     if(data.sheetUrl) $("sheetLink").href = data.sheetUrl;
+    if(data.settings){
+      settings = data.settings;
+      if(settings.title){
+        $("pageTitle").textContent = settings.title + "　入力確認・訂正反映";
+        document.title = settings.title + " 入力確認・訂正反映";
+      }
+    }
     $("updated").textContent = "最終更新 " + new Date().toLocaleTimeString("ja-JP");
     msg.textContent="";
     render();

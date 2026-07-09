@@ -139,14 +139,14 @@
     cursor:pointer; color:#fff; background:#0b7bef;}
   .kp-grid button:active{filter:brightness(.85);}
   .kp-grid .num{grid-column:span 4;}
-  .kp-grid .b6{grid-column:span 4;}
-  .kp-grid .dot{grid-column:span 12;}
-  .kp-grid .next{background:var(--next); font-size:18px;}
-  .kp-grid .next:active{background:var(--next-press);}
   .kp-grid .bs{background:#e23b3b;}
-  #kpDone{width:100%; margin-top:12px; height:54px; border:none; border-radius:10px;
-    background:#7a8494; color:#fff; font-size:20px; font-weight:bold; cursor:pointer;}
-  #kpDone:active{background:#5f6877;}
+  .kp-actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px;}
+  .kp-actions button{border:none; border-radius:10px; height:56px; font-size:20px; font-weight:bold;
+    color:#fff; cursor:pointer;}
+  .kp-actions button:active{filter:brightness(.85);}
+  .kp-next{background:var(--next);}
+  .kp-next:active{background:var(--next-press);}
+  .kp-done{background:#7a8494;}
 </style>
 </head>
 <body>
@@ -238,11 +238,13 @@
       <button type="button" class="num" data-k="2">2</button>
       <button type="button" class="num" data-k="3">3</button>
       <button type="button" class="num" data-k="0">0</button>
-      <button type="button" class="b6 next" data-k="next">次へ</button>
-      <button type="button" class="b6 bs" data-k="bs">⌫</button>
-      <button type="button" class="num dot" data-k=".">.</button>
+      <button type="button" class="num" data-k=".">.</button>
+      <button type="button" class="num bs" data-k="bs">⌫</button>
     </div>
-    <button type="button" id="kpDone">決定</button>
+    <div class="kp-actions">
+      <button type="button" class="kp-next" data-k="next">次へ</button>
+      <button type="button" class="kp-done" data-k="done">決定</button>
+    </div>
   </div>
 </div>
 
@@ -723,15 +725,15 @@ function initKeypad(){
   touchifyFields(["bib","f_D","f_katen","f_SB","f_shushin","f_time","f_line1","f_line2"]);
   // E欄は buildERow() 内で touchifyFields される
 
-  document.querySelectorAll("#keypad .kp-grid button").forEach(b=>{
+  document.querySelectorAll("#keypad .kp-grid button, #keypad .kp-actions button").forEach(b=>{
     b.addEventListener("click", (ev)=>{
       ev.preventDefault();
       const k = b.dataset.k;
       if(k === "next") kpNext();
+      else if(k === "done") kpClose();
       else kpApply(k);
     });
   });
-  document.getElementById("kpDone").addEventListener("click", (ev)=>{ ev.preventDefault(); kpClose(); });
   // 背景タップで閉じる（キーパッド本体のタップでは閉じない）
   document.getElementById("kpOverlay").addEventListener("click", (ev)=>{
     if(ev.target === document.getElementById("kpOverlay")) kpClose();

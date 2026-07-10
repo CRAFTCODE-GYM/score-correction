@@ -16,18 +16,22 @@
     color:var(--ink); background:#fafafa; padding:16px; max-width:1100px; margin:0 auto;
     touch-action:manipulation;}
 
-  .pagehead{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px;}
-  .pagehead h1{font-size:19px;}
+  .pagehead{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:5px;}
+  .pagehead h1{font-size:16px;}
   #tournTitle{font-size:15px; color:#3f51b5; font-weight:bold;}
 
-  /* タブ */
-  .tabs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
-  .tabs .tab{padding:8px 22px; border:1px solid #bbb; background:#fff; cursor:pointer;
-    border-radius:6px 6px 0 0; font-size:15px; user-select:none;}
+  /* タブ（省スペース・1行表示） */
+  .tabs{display:flex; gap:4px; margin-bottom:5px; flex-wrap:nowrap; overflow-x:auto;
+    -webkit-overflow-scrolling:touch; scrollbar-width:thin;}
+  .tabs::-webkit-scrollbar{height:4px;}
+  .tabs .tab{padding:4px 12px; border:1px solid #bbb; background:#fff; cursor:pointer;
+    border-radius:5px 5px 0 0; font-size:13px; user-select:none; white-space:nowrap; flex:0 0 auto;}
   .tabs .tab.active{background:var(--btn); color:#fff; border-color:var(--btn); font-weight:bold;}
   .box.kp-active{outline:3px solid #0b7bef; outline-offset:1px;}
   .box.kp-active .lbl{background:#0b7bef; color:#fff;}
   .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#111;}
+  .tabrow{display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap;}
+  .tabrow .tabs{margin-bottom:5px;}
 
   .card{background:#fff; border:1px solid #ddd; border-radius:8px; padding:20px; margin-top:6px;}
 
@@ -98,7 +102,7 @@
     body{padding:10px;}
     .card{padding:14px;}
     .grid{margin-top:12px; gap:10px;}
-    .tabs .tab{padding:12px 22px; font-size:17px;}
+    .tabs .tab{padding:6px 14px; font-size:14px;}
     .box .lbl{font-size:16px; padding:6px;}
     .box input, .box .val{min-height:64px;}
     #bib{height:84px;}
@@ -129,7 +133,6 @@
   .kp-field{font-size:16px; font-weight:bold; margin-top:6px;}
   .kp-field.is-e{font-size:19px; color:#fff; background:#0b7bef; border-radius:8px;
     padding:6px 10px; display:inline-block;}
-  .kp-range{font-size:12px; color:#888; margin-top:2px; min-height:15px;}
   .kp-hr{border:none; border-top:1px solid #ddd; margin:10px 0;}
   .kp-display{border:2px solid var(--btn); background:#f4f6f8; border-radius:8px;
     height:56px; display:flex; align-items:center; justify-content:center;
@@ -160,12 +163,13 @@
   <span id="tournTitle"></span>
 </div>
 
-<!-- 性別タブ -->
-<div class="tabs" id="genderTabs"></div>
+<!-- 性別・モードタブ（1行にまとめる） -->
+<div class="tabrow">
+  <div class="tabs" id="genderTabs"></div>
+  <div class="tabs mode-tabs" id="modeTabs"></div>
+</div>
 <!-- 種目タブ -->
 <div class="tabs" id="eventTabs"></div>
-<!-- モードタブ -->
-<div class="tabs mode-tabs" id="modeTabs"></div>
 
 <div class="card">
   <div class="head">
@@ -223,7 +227,6 @@
       <div class="kp-player" id="kpPlayer">－</div>
       <div class="kp-sub" id="kpSub"></div>
       <div class="kp-field" id="kpField"></div>
-      <div class="kp-range" id="kpRange"></div>
     </div>
     <hr class="kp-hr">
     <div class="kp-display" id="kpDisplay"></div>
@@ -266,11 +269,6 @@ const FIELD_LABELS = {
   bib:"ゼッケン", f_D:"Dスコア", f_katen:"高体連加点", f_SB:"SB",
   f_E1:"E1", f_E2:"E2", f_E3:"E3", f_E4:"E4", f_E5:"E5",
   f_shushin:"減点", f_time:"TIME", f_line1:"LINE1", f_line2:"LINE2"
-};
-const RANGE_HINTS = {
-  f_D:"0.0 〜 15.0", f_katen:"0.0 〜 5.0", f_SB:"0.0 〜 1.0",
-  f_E1:"0.0 〜 10.0", f_E2:"0.0 〜 10.0", f_E3:"0.0 〜 10.0", f_E4:"0.0 〜 10.0", f_E5:"0.0 〜 10.0",
-  f_shushin:"0.0 〜 5.0", f_time:"0.0 〜 5.0", f_line1:"0.0 〜 5.0", f_line2:"0.0 〜 5.0"
 };
 
 /* ================= 状態（リロード後も保持） ================= */
@@ -490,13 +488,13 @@ function calcE(values){
   return trunc3((sorted[1]+sorted[2]+sorted[3])/3);
 }
 
-/* 決定点を計算して返す（入力モード用、表示は更新しない） */
+/* 決定点を計算して返す（入力モード用、最低0点でクランプ） */
 function computeFinal(){
   const D = num("f_D") ?? 0, katen = num("f_katen") ?? 0, SB = num("f_SB") ?? 0;
   const es = eIds().map(id => num(id) ?? 0);
   const E = calcE(es);
   const pen = r3((num("f_shushin")??0)+(num("f_time")??0)+(num("f_line1")??0)+(num("f_line2")??0));
-  return r3(D + katen + SB + E - pen);
+  return Math.max(0, r3(D + katen + SB + E - pen));
 }
 
 function recalc(){
@@ -550,13 +548,6 @@ async function send(){
     }
   }else{
     scoreIds().forEach(id => { const k=id.slice(2); if(raw[k] === null) raw[k] = 0; });
-    // 決定点がマイナスのまま保存されないようにする
-    const finalScore = computeFinal();
-    if(finalScore !== null && finalScore < 0){
-      st.className="err";
-      st.textContent="決定点がマイナスです（" + finalScore.toFixed(3) + "）。入力値を確認してください。";
-      return;
-    }
   }
 
   const payload = {
@@ -673,7 +664,6 @@ function updateKpHead(){
     sEl.textContent = state.gender + " " + state.event;
   }
   document.getElementById("kpField").textContent = FIELD_LABELS[kpTarget] || "";
-  document.getElementById("kpRange").textContent = RANGE_HINTS[kpTarget] || "";
   // E欄なら「E2（2人目 / 全4審判）」のように審判位置を強調表示
   const fEl = document.getElementById("kpField");
   fEl.classList.remove("is-e");

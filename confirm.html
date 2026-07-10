@@ -51,8 +51,12 @@
   #foldedList{margin-top:10px; display:none;}
   #foldedList.open{display:block;}
 
-  .grp-head{background:#3f51b5; color:#fff; font-weight:bold; font-size:14px;
-    padding:8px 14px; border-radius:6px; margin:16px 0 8px;}
+  .grp-head{background:#3f51b5; color:#fff; font-weight:bold; font-size:15px;
+    padding:8px 14px; border-radius:6px; margin:16px 0 8px; display:flex; align-items:center; gap:10px;}
+  .grp-head .grp-total{font-weight:normal; font-size:13px; opacity:.85;}
+  .grp-head .grp-badge{margin-left:auto; font-size:13px; font-weight:bold; padding:2px 12px; border-radius:12px;
+    background:#ffd54a; color:#7a5600;}
+  .grp-head .grp-badge.done{background:rgba(255,255,255,.25); color:#fff;}
 
   .card{background:#fff; border:1px solid #e2e5ea; border-radius:10px; margin-bottom:12px;
     box-shadow:0 1px 3px rgba(0,0,0,.06); overflow:hidden;}
@@ -142,9 +146,9 @@
   <div class="bar">
     <label><input type="checkbox" id="onlyNew"> 未反映のみ表示</label>
     <label><input type="checkbox" id="autoReload" checked> 自動更新（15秒）</label>
-    <label>グループ:
+    <label>表示:
       <select id="groupBy">
-        <option value="none">なし（時系列）</option>
+        <option value="none">時系列（新着順）</option>
         <option value="event">種目ごと</option>
       </select>
     </label>
@@ -222,7 +226,7 @@ function finalOf(r){
   for(let i=1;i<=jc;i++) es.push(n(r["E"+i]));
   const E = calcE(es);
   const pen = n(r.shushin)+n(r.time)+n(r.line1)+n(r.line2);
-  return n(r.D)+n(r.katen)+n(r.SB)+E-pen;
+  return Math.max(0, n(r.D)+n(r.katen)+n(r.SB)+E-pen);
 }
 function fmtTime(ts){
   if(!ts) return "";
@@ -409,8 +413,13 @@ function render(){
     rows.forEach(r => { (groups[key(r)] = groups[key(r)]||[]).push(r); });
     let html = "";
     const emit = k => {
-      html += `<div class="grp-head">${esc(k)}（${groups[k].length}件）</div>`;
-      html += groups[k].map(renderCard).join("");
+      const list = groups[k];
+      const unref = list.filter(r=>!r.reflected).length;
+      const badge = unref > 0
+        ? `<span class="grp-badge">未反映 ${unref}</span>`
+        : `<span class="grp-badge done">完了</span>`;
+      html += `<div class="grp-head">${esc(k)}<span class="grp-total">（${list.length}件）</span>${badge}</div>`;
+      html += list.map(renderCard).join("");
     };
     const seen = new Set();
     order.forEach(k => { if(groups[k]){ seen.add(k); emit(k); } });

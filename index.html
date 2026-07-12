@@ -29,11 +29,21 @@
   .tabs .tab.active{background:var(--btn); color:#fff; border-color:var(--btn); font-weight:bold;}
   .box.kp-active{outline:3px solid #0b7bef; outline-offset:1px;}
   .box.kp-active .lbl{background:#0b7bef; color:#fff;}
-  .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#111;}
+  .tabs.mode-tabs .tab.active{background:#34c759; border-color:#34c759; color:#fff;}
+  .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#3a2b00;}
   .tabrow{display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap;}
   .tabrow .tabs{margin-bottom:5px;}
 
   .card{background:#fff; border:1px solid #ddd; border-radius:8px; padding:20px; margin-top:6px;}
+
+  /* 入力／訂正のモード識別（カード全体を色分け） */
+  .card{border-top:8px solid #34c759; position:relative;}
+  .card.mode-correction{border-top-color:#e6a817; background:#fffdf3; border-color:#f0d99a;}
+  .card.mode-input{border-top-color:#34c759;}
+  .mode-strip{margin:-20px -20px 16px; padding:8px 20px; font-size:17px; font-weight:bold;
+    letter-spacing:2px; color:#fff; background:#34c759;}
+  .card.mode-correction .mode-strip{background:#e6a817; color:#4a3500;}
+  .mode-strip .ms-sub{font-size:13px; font-weight:normal; letter-spacing:0; margin-left:12px; opacity:.95;}
 
   /* ヘッダ行：モード表示・ゼッケン・選手 */
   .head{display:flex; align-items:stretch; gap:14px; margin-bottom:6px;}
@@ -76,6 +86,8 @@
     color:#fff; background:var(--btn); border:none; border-radius:4px; cursor:pointer;}
   #send:hover{background:var(--btn-hover);}
   #send:disabled{background:#aaa; cursor:not-allowed;}
+  #send.correction{background:#e6a817; color:#3a2b00;}
+  #send.correction:hover{background:#d09a10;}
   #zeroFill{width:150px; padding:16px 10px; font-size:18px; font-weight:bold;
     color:#333; background:#e0e0e0; border:1px solid #bbb; border-radius:4px; cursor:pointer;}
   #zeroFill:hover{background:#d0d0d0;}
@@ -126,10 +138,16 @@
   #kpOverlay.open{display:flex;}
   #kpOverlay.closing{opacity:0;} /* 閉じ際もクリックを吸収してゴーストクリックを防ぐ */
   #keypad{background:#fff; border-radius:16px; width:100%; max-width:430px;
+    border-top:6px solid #34c759;
     box-shadow:0 10px 40px rgba(0,0,0,.35); padding:18px 18px 16px;}
   .kp-head{text-align:center; margin-bottom:8px;}
   .kp-player{font-size:18px; font-weight:bold;}
   .kp-sub{font-size:12px; color:#888; margin-top:2px;}
+  .kp-mode{display:inline-block; padding:3px 14px; border-radius:12px; font-size:13px;
+    font-weight:bold; margin-bottom:6px;}
+  .kp-mode.in{background:#34c759; color:#fff;}
+  .kp-mode.corr{background:#e6a817; color:#3a2b00;}
+  #keypad.kp-correction{border-top:6px solid #e6a817;}
   .kp-field{font-size:16px; font-weight:bold; margin-top:6px;}
   .kp-field.is-e{font-size:19px; color:#fff; background:#0b7bef; border-radius:8px;
     padding:6px 10px; display:inline-block;}
@@ -171,7 +189,8 @@
 <!-- 種目タブ -->
 <div class="tabs" id="eventTabs"></div>
 
-<div class="card">
+<div class="card" id="formCard">
+  <div class="mode-strip" id="modeStrip">得点入力<span class="ms-sub" id="modeStripSub"></span></div>
   <div class="head">
     <div class="ctx">
       <span id="ctxGender">女子</span>
@@ -203,7 +222,7 @@
     <div class="box"><div class="lbl">TIME</div><input id="f_time" type="number" step="0.1" min="0"></div>
     <div class="box"><div class="lbl">LINE1</div><input id="f_line1" type="number" step="0.1" min="0"></div>
     <div class="box"><div class="lbl">LINE2</div><input id="f_line2" type="number" step="0.1" min="0"></div>
-    <div class="box calc pen" id="penBox"><div class="lbl" style="color:#333">ペナルティ</div><div class="val" id="penVal" style="color:#333">-</div></div>
+    <div class="box calc pen" id="penBox"><div class="lbl" style="color:#333" id="penLbl">ペナルティ</div><div class="val" id="penVal" style="color:#333">-</div></div>
   </div>
 
   <div class="actions">
@@ -224,6 +243,7 @@
 <div id="kpOverlay">
   <div id="keypad">
     <div class="kp-head">
+      <div class="kp-mode in" id="kpMode">得点入力</div>
       <div class="kp-player" id="kpPlayer">－</div>
       <div class="kp-sub" id="kpSub"></div>
       <div class="kp-field" id="kpField"></div>
@@ -336,10 +356,27 @@ function saveState(){
 function refreshContext(){
   document.getElementById("ctxGender").textContent = state.gender;
   document.getElementById("ctxEvent").textContent  = state.event;
+  const isCorr = state.mode === "訂正";
   const badge = document.getElementById("modeBadge");
   badge.textContent = state.mode;
-  badge.className = "mode-badge " + (state.mode==="入力" ? "input" : "correction");
-  const hide = state.mode === "訂正";
+  badge.className = "mode-badge " + (isCorr ? "correction" : "input");
+
+  // カード全体を色分けして入力／訂正をはっきり区別
+  const card = document.getElementById("formCard");
+  card.classList.toggle("mode-correction", isCorr);
+  card.classList.toggle("mode-input", !isCorr);
+  document.getElementById("modeStrip").firstChild.nodeValue = isCorr ? "得点訂正" : "得点入力";
+  document.getElementById("modeStripSub").textContent = isCorr
+    ? "訂正する項目だけ入力してください（未入力は変更なし）"
+    : "全項目を入力してください（未入力は 0.0 として記録）";
+  // 送信ボタンも色を合わせる
+  const sendBtn = document.getElementById("send");
+  sendBtn.classList.toggle("correction", isCorr);
+  sendBtn.textContent = isCorr ? "訂正を本部へ送信" : "本部記録へ送信";
+
+  const hide = isCorr;
+  // ペナルティ表記：男子は「ND」、女子は「ペナルティ」
+  document.getElementById("penLbl").textContent = (state.gender === "男子") ? "ND" : "ペナルティ";
   document.getElementById("finalBox").style.visibility  = hide ? "hidden" : "visible";
   const esc = document.getElementById("escoreBox");
   if(esc) esc.style.visibility = hide ? "hidden" : "visible";
@@ -504,11 +541,10 @@ function recalc(){
   const pen = r3((num("f_shushin")??0)+(num("f_time")??0)+(num("f_line1")??0)+(num("f_line2")??0));
   const final = computeFinal();
   const escoreEl = document.getElementById("escoreVal");
-  if(escoreEl) escoreEl.textContent = fmt(E);
-  document.getElementById("penVal").textContent = fmt(pen);
+  if(escoreEl) escoreEl.textContent = E.toFixed(3);   // 8.333 のように小数第3位まで
+  document.getElementById("penVal").textContent = pen.toFixed(1); // 0.4 のように小数第1位まで
   document.getElementById("finalVal").textContent = final.toFixed(3);
 }
-function fmt(x){ return (Math.round(x*1000)/1000).toString(); }
 
 /* E1〜Enは小数第1位まで表示（8 → 8.0） */
 function formatEField(id){
@@ -653,6 +689,13 @@ function updateKpHead(){
   const bib = document.getElementById("bib").value.trim();
   const pEl = document.getElementById("kpPlayer");
   const sEl = document.getElementById("kpSub");
+  const isCorr = state.mode === "訂正";
+  // テンキー上でも入力／訂正が分かるようにモードを色付き表示
+  const kp = document.getElementById("keypad");
+  kp.classList.toggle("kp-correction", isCorr);
+  const mEl = document.getElementById("kpMode");
+  mEl.textContent = isCorr ? "得点訂正" : "得点入力";
+  mEl.className = "kp-mode " + (isCorr ? "corr" : "in");
   if(kpTarget === "bib"){
     pEl.textContent = "ゼッケン入力";
     sEl.textContent = state.gender + " " + state.event;

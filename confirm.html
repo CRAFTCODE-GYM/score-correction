@@ -129,6 +129,25 @@
   .card.done .reflect-lbl{background:#eef4ee; border-color:#bcd3bc; color:#3a6b3a;}
 
   .empty{text-align:center; color:#999; padding:50px; background:#fff; border-radius:10px;}
+
+  /* 新着通知バナー */
+  #newBanner{display:none; align-items:center; gap:12px; margin:0 0 12px;
+    background:#fff8e1; border:2px solid #f0b429; border-radius:10px;
+    padding:12px 16px; font-size:16px; font-weight:bold; color:#7a5200;
+    box-shadow:0 2px 8px rgba(240,180,41,.35); cursor:pointer;
+    animation:bannerIn .3s ease;}
+  #newBanner.show{display:flex;}
+  #newBanner .nb-dot{width:12px; height:12px; border-radius:50%; background:#e08a00;
+    animation:blink 1s infinite; flex:none;}
+  #newBanner .nb-close{margin-left:auto; font-weight:normal; font-size:13px; color:#a07a1e;}
+  @keyframes bannerIn{from{opacity:0; transform:translateY(-8px);} to{opacity:1; transform:none;}}
+  @keyframes blink{0%,100%{opacity:1;} 50%{opacity:.25;}}
+
+  /* 新着カードの強調（未反映のうち、直近の更新で届いたもの） */
+  .card.arrived{border:2px solid #f0b429; border-left:8px solid #f0b429;
+    box-shadow:0 0 0 3px rgba(240,180,41,.25);}
+  .card.arrived .card-head::before{content:"NEW"; background:#e08a00; color:#fff;
+    font-size:12px; font-weight:bold; padding:2px 10px; border-radius:10px; margin-right:4px;}
   #setup{background:#fff3cd; border:1px solid #e0c96a; padding:12px; border-radius:6px; margin:16px; font-size:14px; display:none;}
 </style>
 </head>
@@ -145,7 +164,8 @@
 <div class="wrap">
   <div class="bar">
     <label><input type="checkbox" id="onlyNew"> 未反映のみ表示</label>
-    <label><input type="checkbox" id="autoReload" checked> 自動更新（15秒）</label>
+    <label><input type="checkbox" id="autoReload" checked> 自動更新（1分）</label>
+    <label><input type="checkbox" id="soundOn" checked> 新着通知音</label>
     <label>表示:
       <select id="groupBy">
         <option value="none">時系列（新着順）</option>
@@ -170,6 +190,7 @@
   </div>
 
   <div class="copyhint">値をクリックすると、その数値がクリップボードにコピーされます（そのまま転記先システムに貼り付け）。</div>
+  <div id="newBanner"><span class="nb-dot"></span><span id="newBannerText"></span><span class="nb-close">クリックで閉じる</span></div>
   <div id="msg"></div>
   <div id="foldedArea"></div>
   <div id="listArea"></div>
@@ -190,6 +211,11 @@ let busy = false;
 let timer = null;
 let foldTick = null;
 let foldedOpen = false;
+let knownRows = null;      // 前回取得時に存在した行番号のSet（初回はnull＝基準取り）
+let arrivedAt = {};        // 行番号 → 新着として検知した時刻
+const ARRIVED_HL_MS = 5*60*1000;  // NEW強調の表示時間（5分）
+let baseTitle = document.title;
+let newCount = 0;          // バナーを閉じるまでの累計新着件数
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -244,7 +270,10 @@ function fld(cls, label, rawVal){
 }
 
 function renderCard(r){
-  const cls = (r.reflected ? "done" : "new") + (r.mode==="訂正" ? " corr" : "");
+  const isArrived = !r.reflected && arrivedAt[r.row]
+    && (Date.now() - arrivedAt[r.row]) < ARRIVED_HL_MS;
+  const cls = (r.reflected ? "done" : "new") + (r.mode==="訂正" ? " corr" : "")
+    + (isArrived ? " arrived" : "");
   const gcls = r.gender === "男子" ? "m" : (r.gender === "女子" ? "w" : "");
   const modeTag = r.mode==="入力"
     ? '<span class="tag in">入力</span>'
@@ -355,6 +384,7 @@ async function load(){
     const data = await res.json();
     if(!data.ok){ msg.className="err"; msg.textContent="取得エラー: " + (data.error||"不明"); return; }
     records = data.records || [];
+    detectNew(records);
     if(data.sheetUrl) $("sheetLink").href = data.sheetUrl;
     if(data.settings){
       settings = data.settings;
@@ -362,7 +392,8 @@ async function load(){
       if(settings.eventsW && settings.eventsW.length) EVENT_ORDER["女子"] = settings.eventsW;
       if(settings.title){
         $("pageTitle").textContent = settings.title + "　入力確認・訂正反映";
-        document.title = settings.title + " 入力確認・訂正反映";
+        baseTitle = settings.title + " 入力確認・訂正反映";
+        document.title = (newCount > 0 ? `【新着${newCount}】` : "") + baseTitle;
       }
     }
     $("updated").textContent = "最終更新 " + new Date().toLocaleTimeString("ja-JP");
@@ -371,6 +402,63 @@ async function load(){
   }catch(e){
     msg.className="err"; msg.textContent="取得失敗（GAS_URL・デプロイ設定を確認）";
   }
+}
+
+/* ===== 新着検知（スプレッドシートへの書き込みを行番号の増分で検知） ===== */
+function detectNew(recs){
+  const rowsNow = new Set(recs.map(r => r.row));
+  if(knownRows){
+    const fresh = recs.filter(r => !knownRows.has(r.row));
+    if(fresh.length){
+      const now = Date.now();
+      fresh.forEach(r => { arrivedAt[r.row] = now; });
+      notifyNew(fresh);
+    }
+  }
+  knownRows = rowsNow;  // 初回読み込みは基準取りのみ（通知しない）
+}
+
+function notifyNew(fresh){
+  newCount += fresh.length;
+  const parts = fresh.slice(0,3).map(r =>
+    `${r.mode} ${r.gender}${r.event} ${r.bib} ${r.playerName||""}`.trim());
+  let text = `新着 ${newCount}件：` + parts.join(" ／ ");
+  if(fresh.length > 3) text += ` ほか${fresh.length-3}件`;
+  $("newBannerText").textContent = text;
+  $("newBanner").classList.add("show");
+  document.title = `【新着${newCount}】` + baseTitle;
+  chime();
+}
+
+function dismissBanner(){
+  newCount = 0;
+  $("newBanner").classList.remove("show");
+  document.title = baseTitle;
+}
+
+let audioCtx = null;
+function ensureAudio(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === "suspended") audioCtx.resume();
+  }catch(e){}
+}
+function chime(){
+  if(!$("soundOn").checked) return;
+  ensureAudio();
+  if(!audioCtx) return;
+  try{
+    const t0 = audioCtx.currentTime;
+    [[880,0],[1174.66,0.18]].forEach(([f,dt])=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0+dt);
+      g.gain.exponentialRampToValueAtTime(0.35, t0+dt+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+dt+0.5);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0+dt); o.stop(t0+dt+0.55);
+    });
+  }catch(e){}
 }
 
 function render(){
@@ -480,7 +568,7 @@ async function toggleReflect(cb){
 
 function setAutoReload(){
   if(timer){ clearInterval(timer); timer=null; }
-  if($("autoReload").checked) timer = setInterval(load, 15000);
+  if($("autoReload").checked) timer = setInterval(load, 60000);
 }
 function setFoldTick(){
   if(foldTick){ clearInterval(foldTick); foldTick=null; }
@@ -492,6 +580,8 @@ $("onlyNew").addEventListener("change", render);
 $("groupBy").addEventListener("change", render);
 $("foldDelay").addEventListener("change", ()=>{ setFoldTick(); render(); });
 $("autoReload").addEventListener("change", setAutoReload);
+$("newBanner").addEventListener("click", dismissBanner);
+document.addEventListener("pointerdown", ensureAudio, true);
 if(!GAS_URL || !API_TOKEN) $("setup").style.display="block";
 setAutoReload();
 setFoldTick();

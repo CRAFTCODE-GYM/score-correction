@@ -122,26 +122,47 @@
     background:#fafbfc; flex-wrap:wrap;}
   .final{font-size:15px;}
   .final b{font-size:22px; color:#b23a2a; margin-left:6px; font-variant-numeric:tabular-nums;}
-  .reflect-lbl{margin-left:auto; display:inline-flex; align-items:center; gap:8px;
+  .reflect-lbl, .approve-lbl{display:inline-flex; align-items:center; gap:8px;
     font-size:15px; font-weight:bold; cursor:pointer; padding:6px 14px; border-radius:8px;
     border:1px solid #cfd6e4; background:#fff;}
-  .reflect-lbl input{width:22px; height:22px; cursor:pointer;}
+  .approve-lbl{margin-left:auto;}
+  .reflect-lbl input, .approve-lbl input{width:22px; height:22px; cursor:pointer;}
   .card.done .reflect-lbl{background:#eef4ee; border-color:#bcd3bc; color:#3a6b3a;}
+  .approve-lbl.on{background:#eef1fb; border-color:#9fb0e0; color:#2c3f8f;}
 
   .empty{text-align:center; color:#999; padding:50px; background:#fff; border-radius:10px;}
 
-  /* 新着通知バナー */
-  #newBanner{display:none; align-items:center; gap:12px; margin:0 0 12px;
-    background:#fff8e1; border:2px solid #f0b429; border-radius:10px;
-    padding:12px 16px; font-size:16px; font-weight:bold; color:#7a5200;
-    box-shadow:0 2px 8px rgba(240,180,41,.35); cursor:pointer;
-    animation:bannerIn .3s ease;}
-  #newBanner.show{display:flex;}
-  #newBanner .nb-dot{width:12px; height:12px; border-radius:50%; background:#e08a00;
+  /* 性別フィルター（セグメント） */
+  .seg{display:inline-flex; border:1px solid #cfd6e4; border-radius:8px; overflow:hidden; background:#fff;}
+  .seg button{border:none; background:#fff; padding:7px 18px; font-size:14px; font-weight:bold;
+    color:#555; cursor:pointer; border-right:1px solid #e2e5ea;}
+  .seg button:last-child{border-right:none;}
+  .seg button.on{background:var(--btn); color:#fff;}
+  .seg button[data-g="男子"].on{background:#1e63c4;}
+  .seg button[data-g="女子"].on{background:#c43570;}
+
+  /* 新着ポップアップ */
+  .npop-overlay{display:none; position:fixed; inset:0; background:rgba(20,24,34,.55);
+    z-index:200; align-items:center; justify-content:center; padding:20px;}
+  .npop-overlay.show{display:flex;}
+  .npop{background:#fff; border-radius:14px; width:min(560px, 94vw); max-height:82vh;
+    display:flex; flex-direction:column; box-shadow:0 12px 40px rgba(0,0,0,.35);
+    animation:popIn .22s ease;}
+  @keyframes popIn{from{opacity:0; transform:scale(.94);} to{opacity:1; transform:none;}}
+  .npop-head{display:flex; align-items:center; gap:10px; padding:16px 20px;
+    font-size:18px; font-weight:bold; color:#7a5200; background:#fff8e1;
+    border-bottom:2px solid #f0b429; border-radius:14px 14px 0 0;}
+  .npop-head .nb-dot{width:14px; height:14px; border-radius:50%; background:#e08a00;
     animation:blink 1s infinite; flex:none;}
-  #newBanner .nb-close{margin-left:auto; font-weight:normal; font-size:13px; color:#a07a1e;}
-  @keyframes bannerIn{from{opacity:0; transform:translateY(-8px);} to{opacity:1; transform:none;}}
   @keyframes blink{0%,100%{opacity:1;} 50%{opacity:.25;}}
+  .npop-list{overflow-y:auto; padding:10px 20px;}
+  .npop-item{display:flex; align-items:center; gap:10px; padding:10px 4px;
+    border-bottom:1px solid #eee; font-size:16px; flex-wrap:wrap;}
+  .npop-item:last-child{border-bottom:none;}
+  .npop-item b{font-size:17px;}
+  .npop-ok{margin:14px 20px 18px; padding:14px; font-size:17px; font-weight:bold;
+    border:none; border-radius:10px; background:var(--btn); color:#fff; cursor:pointer;}
+  .npop-ok:active{opacity:.85;}
 
   /* 新着カードの強調（未反映のうち、直近の更新で届いたもの） */
   .card.arrived{border:2px solid #f0b429; border-left:8px solid #f0b429;
@@ -163,6 +184,11 @@
 
 <div class="wrap">
   <div class="bar">
+    <div class="seg" id="genderSeg">
+      <button type="button" data-g="all" class="on">全て</button>
+      <button type="button" data-g="男子">男子</button>
+      <button type="button" data-g="女子">女子</button>
+    </div>
     <label><input type="checkbox" id="onlyNew"> 未反映のみ表示</label>
     <label><input type="checkbox" id="autoReload" checked> 自動更新（1分）</label>
     <label><input type="checkbox" id="soundOn" checked> 新着通知音</label>
@@ -190,10 +216,17 @@
   </div>
 
   <div class="copyhint">値をクリックすると、その数値がクリップボードにコピーされます（そのまま転記先システムに貼り付け）。</div>
-  <div id="newBanner"><span class="nb-dot"></span><span id="newBannerText"></span><span class="nb-close">クリックで閉じる</span></div>
   <div id="msg"></div>
   <div id="foldedArea"></div>
   <div id="listArea"></div>
+</div>
+
+<div id="newPopup" class="npop-overlay">
+  <div class="npop">
+    <div class="npop-head"><span class="nb-dot"></span>新着の入力・訂正（<span id="newPopupCount">0</span>件）</div>
+    <div class="npop-list" id="newPopupList"></div>
+    <button type="button" id="newPopupOk" class="npop-ok">OK（確認しました）</button>
+  </div>
 </div>
 
 <script>
@@ -215,7 +248,9 @@ let knownRows = null;      // 前回取得時に存在した行番号のSet（�
 let arrivedAt = {};        // 行番号 → 新着として検知した時刻
 const ARRIVED_HL_MS = 5*60*1000;  // NEW強調の表示時間（5分）
 let baseTitle = document.title;
-let newCount = 0;          // バナーを閉じるまでの累計新着件数
+let newCount = 0;          // ポップアップをOKで閉じるまでの累計新着件数
+let pendingNew = [];       // ポップアップに表示する新着レコード
+let genderFilter = "all";  // "all" | "男子" | "女子"
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -313,8 +348,12 @@ function renderCard(r){
     </div>
     <div class="card-foot">
       ${finalHtml}
+      <label class="approve-lbl${r.approved ? " on" : ""}">
+        <input type="checkbox" class="cb-approve" data-row="${r.row}" ${r.approved?"checked":""}>
+        審判長承認
+      </label>
       <label class="reflect-lbl">
-        <input type="checkbox" data-row="${r.row}" ${r.reflected?"checked":""}>
+        <input type="checkbox" class="cb-reflect" data-row="${r.row}" ${r.reflected?"checked":""}>
         ${r.reflected ? "入力済み" : "入力済みにする"}
       </label>
     </div>
@@ -329,8 +368,11 @@ function bindCards(container){
       copyText(val, el);
     });
   });
-  container.querySelectorAll('input[type="checkbox"][data-row]').forEach(cb=>{
+  container.querySelectorAll('input.cb-reflect[data-row]').forEach(cb=>{
     cb.addEventListener("change", ()=>toggleReflect(cb));
+  });
+  container.querySelectorAll('input.cb-approve[data-row]').forEach(cb=>{
+    cb.addEventListener("change", ()=>toggleApproved(cb));
   });
 }
 
@@ -420,19 +462,25 @@ function detectNew(recs){
 
 function notifyNew(fresh){
   newCount += fresh.length;
-  const parts = fresh.slice(0,3).map(r =>
-    `${r.mode} ${r.gender}${r.event} ${r.bib} ${r.playerName||""}`.trim());
-  let text = `新着 ${newCount}件：` + parts.join(" ／ ");
-  if(fresh.length > 3) text += ` ほか${fresh.length-3}件`;
-  $("newBannerText").textContent = text;
-  $("newBanner").classList.add("show");
+  pendingNew = pendingNew.concat(fresh);
+  $("newPopupList").innerHTML = pendingNew.map(r=>{
+    const modeTag = r.mode==="訂正"
+      ? '<span class="tag co">訂正</span>' : '<span class="tag in">入力</span>';
+    const nm = esc(r.playerName) || "（選手名なし）";
+    const tm = esc(r.team) ? `（${esc(r.team)}）` : "";
+    return `<div class="npop-item">${modeTag}<b>${esc(r.gender)} ${esc(r.event)}</b>`
+      + `<span>No.${esc(r.bib)}　${nm}${tm}</span></div>`;
+  }).join("");
+  $("newPopupCount").textContent = pendingNew.length;
+  $("newPopup").classList.add("show");
   document.title = `【新着${newCount}】` + baseTitle;
   chime();
 }
 
-function dismissBanner(){
+function dismissPopup(){
   newCount = 0;
-  $("newBanner").classList.remove("show");
+  pendingNew = [];
+  $("newPopup").classList.remove("show");
   document.title = baseTitle;
 }
 
@@ -467,8 +515,12 @@ function render(){
   const foldSec = foldSeconds();
   const now = Date.now();
 
-  const total = records.length;
-  const doneCount = records.filter(r=>r.reflected).length;
+  const base = genderFilter === "all"
+    ? records.slice()
+    : records.filter(r => r.gender === genderFilter);
+
+  const total = base.length;
+  const doneCount = base.filter(r=>r.reflected).length;
   $("cNew").textContent  = "未反映 " + (total - doneCount);
   $("cDone").textContent = "反映済 " + doneCount;
 
@@ -479,7 +531,7 @@ function render(){
     return (now - t) >= foldSec * 1000;
   };
 
-  let rows = records.slice();
+  let rows = base;
   const foldedRows = onlyNew ? [] : rows.filter(shouldFold);
   rows = rows.filter(r => !shouldFold(r));
   if(onlyNew) rows = rows.filter(r=>!r.reflected);
@@ -566,6 +618,36 @@ async function toggleReflect(cb){
   }
 }
 
+async function toggleApproved(cb){
+  if(busy){ cb.checked = !cb.checked; return; }
+  const row = Number(cb.dataset.row);
+  const approved = cb.checked;
+  busy = true; cb.disabled = true;
+  const msg = $("msg"); msg.className=""; msg.textContent="更新中…";
+  try{
+    const res = await fetch(GAS_URL, {
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body: JSON.stringify({token:API_TOKEN, action:"markApproved", row:row, approved:approved})
+    });
+    const data = await res.json();
+    if(data.ok){
+      const rec = records.find(r=>r.row===row);
+      if(rec) rec.approved = approved;
+      msg.className="ok"; msg.textContent = approved ? "審判長承認を記録しました" : "審判長承認を取り消しました";
+      render();
+    }else{
+      cb.checked = !approved; msg.className="err";
+      msg.textContent = "承認の更新エラー: " + (data.error||"不明")
+        + "（Code.gsにmarkApprovedを追加して再デプロイしてください）";
+    }
+  }catch(e){
+    cb.checked = !approved; msg.className="err"; msg.textContent="承認の更新に失敗しました";
+  }finally{
+    busy = false;
+  }
+}
+
 function setAutoReload(){
   if(timer){ clearInterval(timer); timer=null; }
   if($("autoReload").checked) timer = setInterval(load, 60000);
@@ -580,7 +662,14 @@ $("onlyNew").addEventListener("change", render);
 $("groupBy").addEventListener("change", render);
 $("foldDelay").addEventListener("change", ()=>{ setFoldTick(); render(); });
 $("autoReload").addEventListener("change", setAutoReload);
-$("newBanner").addEventListener("click", dismissBanner);
+$("genderSeg").querySelectorAll("button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    genderFilter = btn.dataset.g;
+    $("genderSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on", b===btn));
+    render();
+  });
+});
+$("newPopupOk").addEventListener("click", dismissPopup);
 document.addEventListener("pointerdown", ensureAudio, true);
 if(!GAS_URL || !API_TOKEN) $("setup").style.display="block";
 setAutoReload();

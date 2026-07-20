@@ -20,19 +20,51 @@
   .pagehead h1{font-size:16px;}
   #tournTitle{font-size:15px; color:#3f51b5; font-weight:bold;}
 
-  /* タブ（省スペース・1行表示） */
-  .tabs{display:flex; gap:4px; margin-bottom:5px; flex-wrap:nowrap; overflow-x:auto;
-    -webkit-overflow-scrolling:touch; scrollbar-width:thin;}
-  .tabs::-webkit-scrollbar{height:4px;}
-  .tabs .tab{padding:4px 12px; border:1px solid #bbb; background:#fff; cursor:pointer;
-    border-radius:5px 5px 0 0; font-size:13px; user-select:none; white-space:nowrap; flex:0 0 auto;}
-  .tabs .tab.active{background:var(--btn); color:#fff; border-color:var(--btn); font-weight:bold;}
+  /* 担当表示バー（性別・種目は起動時に固定） */
+  .fixedbar{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:8px;}
+  .assign{display:flex; align-items:center; gap:10px; background:#fff; border:1px solid #d5d9e4;
+    border-radius:10px; padding:8px 12px;}
+  .as-gender{font-size:18px; font-weight:bold; color:#fff; padding:4px 16px; border-radius:8px;
+    letter-spacing:2px; background:#556;}
+  .as-gender.m{background:linear-gradient(90deg,#1e63c4,#2f7de0);}
+  .as-gender.w{background:linear-gradient(90deg,#c43570,#e0508f);}
+  .as-event{font-size:24px; font-weight:800; letter-spacing:1px;}
+  .as-change{margin-left:4px; font-size:13px; padding:7px 14px; border:1px solid #bbb;
+    background:#f2f3f5; border-radius:8px; cursor:pointer; color:#555;}
+  .as-change:active{background:#e2e3e5;}
   .box.kp-active{outline:3px solid #0b7bef; outline-offset:1px;}
   .box.kp-active .lbl{background:#0b7bef; color:#fff;}
-  .tabs.mode-tabs .tab.active{background:#34c759; border-color:#34c759; color:#fff;}
-  .tabs.mode-tabs .tab.active.correction{background:#e6a817; border-color:#e6a817; color:#3a2b00;}
-  .tabrow{display:flex; gap:18px; align-items:flex-end; flex-wrap:wrap;}
-  .tabrow .tabs{margin-bottom:5px;}
+
+  /* 入力／訂正の大型切替（現在のモードが一目で分かる） */
+  .mode-seg{display:flex; margin-left:auto; border:2px solid #c8ccd6; border-radius:12px; overflow:hidden; background:#fff;}
+  .mode-seg button{border:none; background:#fff; color:#888; font-size:18px; font-weight:bold;
+    padding:12px 26px; cursor:pointer; letter-spacing:2px;}
+  .mode-seg button + button{border-left:2px solid #c8ccd6;}
+  .mode-seg button.active[data-m="入力"]{background:#34c759; color:#fff;}
+  .mode-seg button.active[data-m="訂正"]{background:#e6a817; color:#3a2b00;}
+
+  /* 担当選択ポップアップ（起動時に性別→種目を選択） */
+  .sel-overlay{display:none; position:fixed; inset:0; background:rgba(20,24,34,.6);
+    z-index:90; align-items:center; justify-content:center; padding:16px;}
+  .sel-overlay.open{display:flex;}
+  .sel-box{background:#fff; border-radius:16px; width:min(560px,94vw); max-height:88vh; overflow-y:auto;
+    padding:22px 24px 26px; box-shadow:0 12px 40px rgba(0,0,0,.35);}
+  .sel-title{font-size:14px; color:#888; font-weight:bold; margin-bottom:4px;}
+  .sel-q{font-size:20px; font-weight:bold; margin:10px 0 16px;}
+  .sel-opts{display:flex; flex-wrap:wrap; gap:12px;}
+  .sel-g{flex:1; min-width:150px; height:96px; border:none; border-radius:14px;
+    font-size:30px; font-weight:800; letter-spacing:4px; color:#fff; cursor:pointer;}
+  .sel-g.m{background:linear-gradient(90deg,#1e63c4,#2f7de0);}
+  .sel-g.w{background:linear-gradient(90deg,#c43570,#e0508f);}
+  .sel-g:active{filter:brightness(.88);}
+  .sel-ev{min-width:calc(50% - 6px); flex:1; height:72px; border-radius:12px; cursor:pointer;
+    font-size:22px; font-weight:bold; background:#fff; color:#333; border:2px solid #c8ccd6;}
+  .sel-ev.m{border-color:#2f7de0; color:#1e63c4;}
+  .sel-ev.w{border-color:#e0508f; color:#c43570;}
+  .sel-ev:active{background:#eef3ff;}
+  .sel-back, .sel-close{margin-top:18px; font-size:14px; padding:9px 16px; border:1px solid #bbb;
+    background:#f2f3f5; border-radius:8px; cursor:pointer; color:#555;}
+  .sel-close{float:right;}
 
   .card{background:#fff; border:1px solid #ddd; border-radius:8px; padding:20px; margin-top:6px;}
 
@@ -54,9 +86,10 @@
   .bib-wrap{display:flex; flex-direction:column;}
   .bib-wrap label{font-size:14px; text-align:center; margin-bottom:2px;}
   #bib{width:130px; height:76px; font-size:34px; text-align:center; border:1px solid var(--line);}
-  .player{flex:1; display:flex; flex-direction:column; border:1px solid var(--panel-blue-ink);}
+  .player{flex:1; display:flex; flex-direction:column; border:1px solid var(--panel-blue-ink); min-width:0;}
   .player div{flex:1; display:flex; align-items:center; justify-content:center;
-    background:var(--panel-blue); color:var(--panel-blue-ink); font-size:22px;}
+    background:var(--panel-blue); color:var(--panel-blue-ink); font-size:22px;
+    white-space:nowrap; overflow:hidden; padding:0 10px;}
   .player div + div{border-top:1px solid var(--panel-blue-ink);}
   .player.found div{color:#111; font-weight:bold;}
   .player.notfound div{color:var(--warn);}
@@ -114,7 +147,7 @@
     body{padding:10px;}
     .card{padding:14px;}
     .grid{margin-top:12px; gap:10px;}
-    .tabs .tab{padding:6px 14px; font-size:14px;}
+    .mode-seg button{padding:14px 24px; font-size:19px;}
     .box .lbl{font-size:16px; padding:6px;}
     .box input, .box .val{min-height:64px;}
     #bib{height:84px;}
@@ -168,6 +201,16 @@
   .kp-next{background:var(--next);}
   .kp-next:active{background:var(--next-press);}
   .kp-done{background:#7a8494;}
+
+  /* ゼッケン入力時はテンキー全体を緑系統に（得点入力との取り違え防止） */
+  #keypad.kp-bib{border-top:6px solid #188038;}
+  #keypad.kp-bib .kp-grid button{background:#22a04a;}
+  #keypad.kp-bib .kp-grid .bs{background:#e23b3b;}
+  #keypad.kp-bib .kp-grid button[data-k="."]{opacity:.3; pointer-events:none;}
+  #keypad.kp-bib .kp-display{border-color:#188038; background:#eef9f1;}
+  #keypad.kp-bib .kp-field{color:#fff; background:#188038; border-radius:8px;
+    display:inline-block; padding:4px 18px; font-size:19px;}
+  .kp-player, .kp-sub{white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 </style>
 </head>
 <body>
@@ -181,13 +224,18 @@
   <span id="tournTitle"></span>
 </div>
 
-<!-- 性別・モードタブ（1行にまとめる） -->
-<div class="tabrow">
-  <div class="tabs" id="genderTabs"></div>
-  <div class="tabs mode-tabs" id="modeTabs"></div>
+<!-- 担当（性別・種目）は起動時ポップアップで固定。右側に入力/訂正の大型切替 -->
+<div class="fixedbar">
+  <div class="assign">
+    <span class="as-gender" id="asGender">－</span>
+    <span class="as-event" id="asEvent">－</span>
+    <button type="button" id="changeAssign" class="as-change">変更</button>
+  </div>
+  <div class="mode-seg" id="modeSeg">
+    <button type="button" data-m="入力">得点入力</button>
+    <button type="button" data-m="訂正">得点訂正</button>
+  </div>
 </div>
-<!-- 種目タブ -->
-<div class="tabs" id="eventTabs"></div>
 
 <div class="card" id="formCard">
   <div class="mode-strip" id="modeStrip">得点入力<span class="ms-sub" id="modeStripSub"></span></div>
@@ -236,6 +284,26 @@
   <div class="toolbar">
     <span id="cacheInfo"></span>
     <button id="reloadPlayers" type="button">選手データ更新</button>
+  </div>
+</div>
+
+<!-- 担当選択ポップアップ（起動時：性別 → 種目） -->
+<div id="selOverlay" class="sel-overlay">
+  <div class="sel-box">
+    <button type="button" id="selClose" class="sel-close" style="display:none;">✕ 閉じる</button>
+    <div class="sel-title">担当の選択（選択後は固定されます）</div>
+    <div id="selStep1">
+      <div class="sel-q">性別を選択してください</div>
+      <div class="sel-opts">
+        <button type="button" class="sel-g m" data-g="男子">男子</button>
+        <button type="button" class="sel-g w" data-g="女子">女子</button>
+      </div>
+    </div>
+    <div id="selStep2" style="display:none;">
+      <div class="sel-q"><span id="selGenderLabel"></span>：種目を選択してください</div>
+      <div class="sel-opts" id="selEvents"></div>
+      <button type="button" id="selBack" class="sel-back">← 性別の選択に戻る</button>
+    </div>
   </div>
 </div>
 
@@ -316,36 +384,77 @@ function scoreIds(){
 }
 function fieldOrder(){ return ["bib", ...scoreIds()]; }
 
-/* ================= タブ描画 ================= */
-function renderTabs(){
-  const g = document.getElementById("genderTabs");
-  g.innerHTML = "";
-  ["男子","女子"].forEach(x=>{
-    const b = document.createElement("div");
-    b.className = "tab" + (x===state.gender ? " active" : "");
-    b.textContent = x;
-    b.onclick = ()=>{ state.gender = x;
-      if(!EVENTS[x].includes(state.event)) state.event = EVENTS[x][0];
-      saveState(); renderTabs(); buildERow(); refreshContext(); lookupPlayer(); recalc(); };
-    g.appendChild(b);
+/* ================= 担当（性別・種目）の固定表示とモード切替 ================= */
+const SESSION_KEY = "sc_assigned"; // このタブのセッション中に担当選択済みかどうか
+
+function renderAssign(){
+  const g = document.getElementById("asGender");
+  g.textContent = state.gender;
+  g.className = "as-gender " + (state.gender === "男子" ? "m" : "w");
+  document.getElementById("asEvent").textContent = state.event || "－";
+}
+function renderModeSeg(){
+  document.querySelectorAll("#modeSeg button").forEach(b=>{
+    b.classList.toggle("active", b.dataset.m === state.mode);
   });
-  const e = document.getElementById("eventTabs");
-  e.innerHTML = "";
-  EVENTS[state.gender].forEach(x=>{
-    const b = document.createElement("div");
-    b.className = "tab" + (x===state.event ? " active" : "");
-    b.textContent = x;
-    b.onclick = ()=>{ state.event = x; saveState(); renderTabs(); refreshContext(); };
-    e.appendChild(b);
+}
+
+/* --- 起動時の担当選択ポップアップ --- */
+let selGender = null;
+function openSelector(){
+  selGender = null;
+  document.getElementById("selStep1").style.display = "";
+  document.getElementById("selStep2").style.display = "none";
+  // 一度選択済みなら「閉じる」を出す（誤タップで開いても戻れる）
+  document.getElementById("selClose").style.display =
+    sessionStorage.getItem(SESSION_KEY) ? "" : "none";
+  document.getElementById("selOverlay").classList.add("open");
+}
+function renderSelEvents(){
+  if(!selGender) return;
+  document.getElementById("selGenderLabel").textContent = selGender;
+  const box = document.getElementById("selEvents");
+  box.innerHTML = "";
+  EVENTS[selGender].forEach(ev=>{
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sel-ev " + (selGender === "男子" ? "m" : "w");
+    b.textContent = ev;
+    b.onclick = ()=>finishSelect(selGender, ev);
+    box.appendChild(b);
   });
-  const m = document.getElementById("modeTabs");
-  m.innerHTML = "";
-  ["入力","訂正"].forEach(x=>{
-    const b = document.createElement("div");
-    b.className = "tab" + (x===state.mode ? " active" : "") + (x==="訂正" ? " correction" : "");
-    b.textContent = x==="入力" ? "得点入力" : "得点訂正";
-    b.onclick = ()=>{ state.mode = x; saveState(); renderTabs(); refreshContext(); recalc(); };
-    m.appendChild(b);
+}
+function finishSelect(g, ev){
+  state.gender = g;
+  state.event  = ev;
+  saveState();
+  sessionStorage.setItem(SESSION_KEY, "1");
+  document.getElementById("selOverlay").classList.remove("open");
+  renderAssign(); buildERow(); refreshContext(); lookupPlayer(); recalc();
+}
+function initSelector(){
+  document.querySelectorAll("#selStep1 .sel-g").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      selGender = b.dataset.g;
+      document.getElementById("selStep1").style.display = "none";
+      document.getElementById("selStep2").style.display = "";
+      renderSelEvents();
+    });
+  });
+  document.getElementById("selBack").addEventListener("click", ()=>{
+    selGender = null;
+    document.getElementById("selStep2").style.display = "none";
+    document.getElementById("selStep1").style.display = "";
+  });
+  document.getElementById("selClose").addEventListener("click", ()=>{
+    document.getElementById("selOverlay").classList.remove("open");
+  });
+  document.getElementById("changeAssign").addEventListener("click", openSelector);
+  document.querySelectorAll("#modeSeg button").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      state.mode = b.dataset.m;
+      saveState(); renderModeSeg(); refreshContext(); recalc();
+    });
   });
 }
 function saveState(){
@@ -476,31 +585,47 @@ function applyEventsFromSettings(){
 function afterSettings(){
   applyEventsFromSettings();
   applySettingsToHeader();
-  renderTabs();
+  renderAssign();
+  // 担当選択ポップアップで種目一覧を表示中なら、取得した最新の種目に更新
+  if(document.getElementById("selOverlay").classList.contains("open")) renderSelEvents();
   buildERow();
   refreshContext();
   recalc();
 }
 
 let currentPlayer = null;
+/* 長い選手名・所属でも改行させず、収まるまで文字を縮小する */
+function fitText(el, min){
+  el.style.fontSize = "";
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  let guard = 0;
+  while(el.scrollWidth > el.clientWidth && size > min && guard++ < 30){
+    size -= 1;
+    el.style.fontSize = size + "px";
+  }
+}
 function lookupPlayer(){
   const bib = document.getElementById("bib").value.trim();
   const box  = document.getElementById("playerBox");
   const nameEl = document.getElementById("playerName");
   const teamEl = document.getElementById("playerTeam");
   currentPlayer = null;
-  if(!bib){ box.className="player"; nameEl.textContent="選手名"; teamEl.textContent="所属（○○県）"; return; }
-  const p = (players[state.gender]||[]).find(x => String(x.bib) === bib);
-  if(p){
-    currentPlayer = p;
-    box.className = "player found";
-    nameEl.textContent = p.name;
-    teamEl.textContent = p.team + "（" + p.pref + "）";
-  }else{
-    box.className = "player notfound";
-    nameEl.textContent = "該当なし";
-    teamEl.textContent = "ゼッケンを確認してください";
+  if(!bib){ box.className="player"; nameEl.textContent="選手名"; teamEl.textContent="所属（○○県）"; }
+  else{
+    const p = (players[state.gender]||[]).find(x => String(x.bib) === bib);
+    if(p){
+      currentPlayer = p;
+      box.className = "player found";
+      nameEl.textContent = p.name;
+      teamEl.textContent = p.team + "（" + p.pref + "）";
+    }else{
+      box.className = "player notfound";
+      nameEl.textContent = "該当なし";
+      teamEl.textContent = "ゼッケンを確認してください";
+    }
   }
+  fitText(nameEl, 14);
+  fitText(teamEl, 12);
 }
 
 /* ================= 計算 ================= */
@@ -693,6 +818,8 @@ function updateKpHead(){
   // テンキー上でも入力／訂正が分かるようにモードを色付き表示
   const kp = document.getElementById("keypad");
   kp.classList.toggle("kp-correction", isCorr);
+  // ゼッケン入力中はテンキー全体を緑系統に切り替え
+  kp.classList.toggle("kp-bib", kpTarget === "bib");
   const mEl = document.getElementById("kpMode");
   mEl.textContent = isCorr ? "得点訂正" : "得点入力";
   mEl.className = "kp-mode " + (isCorr ? "corr" : "in");
@@ -793,17 +920,21 @@ document.getElementById("send").addEventListener("click", send);
 document.getElementById("reloadPlayers").addEventListener("click", ()=>fetchPlayers(true));
 if(!GAS_URL) document.getElementById("setup").style.display = "block";
 
-renderTabs();
+renderModeSeg();
+renderAssign();
 buildERow();
 refreshContext();
 initKeypad();
+initSelector();
 loadPlayersFromCache();
 applyEventsFromSettings();
 applySettingsToHeader();
-renderTabs();
+renderAssign();
 buildERow();
 refreshContext();
 fetchPlayers(false);
+// ブラウザ（タブ）を開いた最初の1回だけ担当選択を求め、以降は固定
+if(!sessionStorage.getItem(SESSION_KEY)) openSelector();
 </script>
 </body>
 </html>
